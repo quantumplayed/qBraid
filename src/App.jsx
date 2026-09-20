@@ -441,9 +441,6 @@ export default function App() {
     }
   };
 
-  const totalGates = qubits.reduce((sum, q) => sum + (q.gates?.length || 0), 0);
-  const totalStateSpace = Math.pow(2, qubits.length);
-
   return (
     <div className="w-full h-screen bg-slate-100 flex flex-col select-none overflow-hidden font-sans">
       {/* ── Top Navigation Bar ────────────────────────────────────────── */}
@@ -457,37 +454,11 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-slate-900 font-bold text-base tracking-wide flex items-center gap-2 font-['Outfit']">
-              Narrative Entangler
-              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-sky-50 border border-sky-200 text-sky-700">
-                Studio 2.0
-              </span>
+              qBraid
             </h1>
             <p className="text-[11px] text-slate-500 font-medium">
               Consistent Quantum Multiverse Story Engine
             </p>
-          </div>
-        </div>
-
-        {/* Live Metrics */}
-        <div className="hidden lg:flex items-center gap-4 text-xs font-mono bg-slate-50 border border-slate-200 px-3.5 py-1.5 rounded-xl text-slate-600 shadow-inner">
-          <div>
-            <span className="text-slate-400 font-normal">Beats: </span>
-            <span className="text-sky-700 font-semibold">{qubits.length}/{MAX_WORLDLINES}</span>
-          </div>
-          <div className="w-[1px] h-3.5 bg-slate-200" />
-          <div>
-            <span className="text-slate-400 font-normal">State Space: </span>
-            <span className="text-purple-700 font-semibold">{totalStateSpace} Timelines</span>
-          </div>
-          <div className="w-[1px] h-3.5 bg-slate-200" />
-          <div>
-            <span className="text-slate-400 font-normal">Gates: </span>
-            <span className="text-slate-800 font-semibold">{totalGates}</span>
-          </div>
-          <div className="w-[1px] h-3.5 bg-slate-200" />
-          <div>
-            <span className="text-slate-400 font-normal">Entangled: </span>
-            <span className="text-amber-700 font-semibold">{connections.length}</span>
           </div>
         </div>
 

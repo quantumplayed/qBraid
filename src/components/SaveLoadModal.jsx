@@ -334,7 +334,7 @@ export default function SaveLoadModal({
                                 />
                                 <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📁</div>
                                 <div style={{ fontWeight: '700', color: '#1e40af', fontSize: '1rem', marginBottom: '0.25rem' }}>
-                                    Click to select a Narrative Entangler .json file
+                                    Click to select a qBraid .json file
                                 </div>
                                 <div style={{ fontSize: '0.82rem', color: '#64748b' }}>
                                     or drag and drop your exported story file here

@@ -26,7 +26,7 @@ export default function AboutModal({ qubits, connections, simulator, onClose }) 
                         </div>
                         <div>
                             <h2 className="text-lg font-bold text-slate-900 tracking-wide flex items-center gap-2">
-                                Narrative Entangler Studio 2.0
+                                qBraid
                                 <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-sky-50 border border-sky-200 text-sky-800 font-semibold">
                                     Industry Overview
                                 </span>

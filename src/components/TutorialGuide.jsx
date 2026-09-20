@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 export default function TutorialGuide({
     isOpen,
@@ -11,12 +11,59 @@ export default function TutorialGuide({
 }) {
     if (!isOpen) return null;
 
+    // Draggable position state
+    const [position, setPosition] = useState(null); // { x: number, y: number }
+    const [isDragging, setIsDragging] = useState(false);
+    const dragRef = useRef(null);
+    const startDragRef = useRef({ mouseX: 0, mouseY: 0, startX: 0, startY: 0 });
+
+    const handleMouseDown = (e) => {
+        // Prevent dragging if clicking buttons or close icon
+        if (e.target.closest('button')) return;
+        
+        const cardElem = dragRef.current;
+        if (!cardElem) return;
+
+        const rect = cardElem.getBoundingClientRect();
+        startDragRef.current = {
+            mouseX: e.clientX,
+            mouseY: e.clientY,
+            startX: rect.left,
+            startY: rect.top,
+        };
+        setIsDragging(true);
+        e.preventDefault();
+    };
+
+    useEffect(() => {
+        if (!isDragging) return;
+
+        const handleMouseMove = (e) => {
+            const deltaX = e.clientX - startDragRef.current.mouseX;
+            const deltaY = e.clientY - startDragRef.current.mouseY;
+            const newX = Math.max(10, Math.min(window.innerWidth - 440, startDragRef.current.startX + deltaX));
+            const newY = Math.max(10, Math.min(window.innerHeight - 150, startDragRef.current.startY + deltaY));
+            setPosition({ x: newX, y: newY });
+        };
+
+        const handleMouseUp = () => {
+            setIsDragging(false);
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isDragging]);
+
     const TUTORIAL_STEPS = [
         {
             step: 1,
             title: '1. Clean Slate: Two Worldlines',
             badge: 'Setup',
-            description: `Welcome to Narrative Entangler! We begin with two clean qubit worldlines representing parallel narrative arcs. At $|0\\rangle$, both stories start in their neutral default states.`,
+            description: `Welcome to qBraid! We begin with two clean qubit worldlines representing parallel narrative arcs. At $|0\\rangle$, both stories start in their neutral default states.`,
             actionLabel: '🧹 Initialize 2 Empty Worldlines',
             actionType: 'RESET_2_QUBITS',
         },
@@ -91,20 +138,28 @@ export default function TutorialGuide({
     };
 
     return (
-        <div style={{
-            position: 'fixed',
-            bottom: '24px',
-            right: '24px',
-            width: '420px',
-            maxWidth: 'calc(100vw - 48px)',
-            background: '#ffffff',
-            border: '1px solid #bfdbfe',
-            borderRadius: '16px',
-            boxShadow: '0 20px 35px -8px rgba(30, 58, 138, 0.22), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-            zIndex: 1200,
-            overflow: 'hidden',
-            animation: 'fadeInUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-        }}>
+        <div
+            ref={dragRef}
+            style={{
+                position: 'fixed',
+                ...(position
+                    ? { top: `${position.y}px`, left: `${position.x}px` }
+                    : { bottom: '24px', right: '24px' }),
+                width: '420px',
+                maxWidth: 'calc(100vw - 48px)',
+                background: '#ffffff',
+                border: '1px solid #bfdbfe',
+                borderRadius: '16px',
+                boxShadow: isDragging
+                    ? '0 25px 50px -10px rgba(30, 58, 138, 0.35), 0 0 0 2px #3b82f6'
+                    : '0 20px 35px -8px rgba(30, 58, 138, 0.22), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                zIndex: 1200,
+                overflow: 'hidden',
+                animation: position ? 'none' : 'fadeInUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                userSelect: isDragging ? 'none' : 'auto',
+                transition: isDragging ? 'box-shadow 0.15s ease' : 'box-shadow 0.2s ease',
+            }}
+        >
             {/* Top progress bar */}
             <div style={{ height: '4px', background: '#e2e8f0', width: '100%' }}>
                 <div style={{
@@ -115,16 +170,30 @@ export default function TutorialGuide({
                 }} />
             </div>
 
-            {/* Header */}
-            <div style={{
-                padding: '1rem 1.25rem 0.75rem 1.25rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                background: '#f8fafc',
-                borderBottom: '1px solid #f1f5f9',
-            }}>
+            {/* Header (Draggable) */}
+            <div
+                onMouseDown={handleMouseDown}
+                style={{
+                    padding: '0.9rem 1.25rem 0.75rem 1.25rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    background: '#f8fafc',
+                    borderBottom: '1px solid #f1f5f9',
+                    cursor: isDragging ? 'grabbing' : 'grab',
+                }}
+                title="Click and drag to move this tutorial window anywhere on screen"
+            >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '2px',
+                        color: '#94a3b8',
+                        paddingRight: '2px',
+                    }}>
+                        <span style={{ fontSize: '10px', lineHeight: 1 }}>⠿</span>
+                    </div>
                     <span style={{ fontSize: '1.25rem' }}>🎓</span>
                     <div>
                         <div style={{ fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', color: '#2563eb', letterSpacing: '0.05em' }}>

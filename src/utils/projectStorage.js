@@ -133,7 +133,7 @@ export const DEMO_STORIES = [
 
 export function exportProjectToJson(qubits, connections, title = 'Multiverse Story') {
     const project = {
-        app: 'Narrative Entangler',
+        app: 'qBraid',
         version: '2.0.0',
         exportedAt: new Date().toISOString(),
         title,
@@ -150,7 +150,7 @@ export function downloadProjectFile(qubits, connections, title = 'Multiverse Sto
     const link = document.createElement('a');
     const safeTitle = title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
     link.href = url;
-    link.download = `narrative_entangler_${safeTitle || 'project'}_${Date.now()}.json`;
+    link.download = `qbraid_${safeTitle || 'project'}_${Date.now()}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

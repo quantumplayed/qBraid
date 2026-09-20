@@ -1,6 +1,6 @@
 /**
  * inkExporter.js
- * Compiles Narrative Entangler's quantum worldlines and state distribution
+ * Compiles qBraid's quantum worldlines and state distribution
  * into an idiomatic, ready-to-run Inkle Ink (.ink) script.
  */
 
@@ -35,7 +35,7 @@ export function generateInkScript(qubits, connections, simulator) {
     }));
 
     let ink = `// =============================================================================
-// NARRATIVE ENTANGLER -> INK MULTIVERSE SCRIPT
+// qBraid -> INK MULTIVERSE SCRIPT
 // Compiled from Quantum Game Engine Circuit (Sparse Joint Amplitudes)
 // Active Story Beats: ${numQubits} | Hilbert Space: ${Math.pow(2, numQubits)} | Valid Branches: ${validStates.length}
 // =============================================================================
