@@ -199,6 +199,7 @@ export default class Worldline extends PIXI.Container {
             hitArea.rect(cx - 18, cy - 18, 36, 36);
             hitArea.fill();
             hitArea.eventMode = 'static';
+            hitArea.hitArea = new PIXI.Rectangle(cx - 18, cy - 18, 36, 36);
             hitArea.cursor = 'pointer';
 
             // Hover state: subtle accent, no tooltip text change
@@ -419,6 +420,7 @@ export default class Worldline extends PIXI.Container {
         this.hitZone.fill();
 
         this.hitZone.eventMode = 'static';
+        this.hitZone.hitArea = new PIXI.Rectangle(startX, this.lineY - 20, totalUsableWidth, 40);
         this.hitZone.cursor = 'crosshair';
 
         // Click vs drag: click places gate, drag starts connection thread

@@ -127,6 +127,7 @@ export default class PixiScene {
       this.stage.addChild(this._dragThread);
 
       this._potentialDrag = null;
+      this._linePointerDown = null;
       this._rebuildWorldlines();
 
       // Stage-level pointer tracking (Pixi v8 eventMode)
@@ -137,6 +138,7 @@ export default class PixiScene {
         this.container.clientHeight
       );
 
+      this.stage.on('pointerdown', (e) => this._onPointerDown(e));
       this.stage.on('pointermove', (e) => this._onPointerMove(e));
       this.stage.on('pointerup', (e) => this._onPointerUp(e));
       this.stage.on('pointerupoutside', (e) => this._onPointerUp(e));
@@ -509,14 +511,83 @@ export default class PixiScene {
   }
 
   // ═══════════════════════════════════════════════════════════════════════
-  //  POINTER / DRAG
+  //  POINTER / DRAG / CLICK-TO-PLACE
   // ═══════════════════════════════════════════════════════════════════════
+
+  _onPointerDown(e) {
+    // Left-click only
+    if (e.button !== 0 && e.nativeEvent?.button !== 0) return;
+
+    const x = e.global.x;
+    const y = e.global.y;
+
+    // Check if clicked near any worldline track
+    for (let i = 0; i < this.worldlines.length; i++) {
+      const wl = this.worldlines[i];
+      if (wl.isNearY(y)) {
+        const usableStart = wl.lineX + wl.START_NODE_WIDTH + 8;
+        const totalUsableWidth = wl.lineWidth - wl.START_NODE_WIDTH - 8;
+
+        // Inside the track zone
+        if (x >= usableStart && x <= usableStart + totalUsableWidth) {
+          // Check if clicking an existing gate
+          const onGate = wl.gates.find(gate => {
+            const gx = usableStart + gate.position * totalUsableWidth;
+            return Math.abs(x - gx) < 18;
+          });
+
+          if (onGate) {
+            const canvasRect = this.app.canvas.getBoundingClientRect();
+            this.onGateContextMenu({
+              qubitId: wl.qubitId,
+              gateId: onGate.id,
+              gate: onGate,
+              screenX: e.nativeEvent?.clientX ?? (canvasRect.left + x),
+              screenY: e.nativeEvent?.clientY ?? (canvasRect.top + y),
+            });
+            return;
+          }
+
+          // Pressed on the line itself -> record for click or drag
+          this._linePointerDown = {
+            sourceIdx: i,
+            qubitId: wl.qubitId,
+            lineY: wl.lineY,
+            startX: usableStart,
+            totalWidth: totalUsableWidth,
+            clickX: x,
+            clickY: y,
+            time: Date.now(),
+          };
+          return;
+        }
+      }
+    }
+  }
 
   _onPointerMove(e) {
     this._cursorX = e.global.x;
     this._cursorY = e.global.y;
 
-    // Check if dragging started from potential drag
+    // Detect drag initiation from line press
+    if (this._linePointerDown && !this._dragActive) {
+      const dx = this._cursorX - this._linePointerDown.clickX;
+      const dy = this._cursorY - this._linePointerDown.clickY;
+      if (Math.sqrt(dx * dx + dy * dy) > 6) {
+        this._dragActive = true;
+        this._dragSourceId = this._linePointerDown.qubitId;
+        this._dragSourceX = this._linePointerDown.clickX;
+        this._dragSourceY = this._linePointerDown.lineY;
+        this._dragCurrentX = this._cursorX;
+        this._dragCurrentY = this._cursorY;
+        this._dragTime = 0;
+        for (const wl of this.worldlines) {
+          wl.setHover(0, false);
+        }
+      }
+    }
+
+    // Check potential drag from worldline internal event
     if (this._potentialDrag && !this._dragActive) {
       const dx = this._cursorX - this._potentialDrag.x;
       const dy = this._cursorY - this._potentialDrag.y;
@@ -551,29 +622,43 @@ export default class PixiScene {
     }
   }
 
-  _onPointerUp(_e) {
+  _onPointerUp(e) {
     this._potentialDrag = null;
-    if (!this._dragActive) return;
 
-    for (const wl of this.worldlines) {
-      if (wl.qubitId === this._dragSourceId) continue;
-      if (wl.isNearY(this._dragCurrentY)) {
-        const sourceIdx = this.qubits.findIndex(q => q.id === this._dragSourceId);
-        const targetIdx = this.qubits.findIndex(q => q.id === wl.qubitId);
-        if (sourceIdx !== -1 && targetIdx !== -1) {
-          // Calculate position from drag start x
-          const sourceWl = this.worldlines[sourceIdx];
-          const position = sourceWl
-            ? Math.max(0.05, Math.min(0.95, (this._dragSourceX - sourceWl.lineX) / sourceWl.lineWidth))
-            : 0.5;
-          this.onCNOTCreate(sourceIdx, targetIdx, position);
+    // 1. If dragging an entanglement connection
+    if (this._dragActive) {
+      for (let targetIdx = 0; targetIdx < this.worldlines.length; targetIdx++) {
+        const wl = this.worldlines[targetIdx];
+        if (wl.qubitId === this._dragSourceId) continue;
+        if (wl.isNearY(this._dragCurrentY)) {
+          const sourceIdx = this.qubits.findIndex(q => q.id === this._dragSourceId);
+          if (sourceIdx !== -1 && targetIdx !== -1) {
+            const sourceWl = this.worldlines[sourceIdx];
+            const usableStart = sourceWl ? sourceWl.lineX + sourceWl.START_NODE_WIDTH + 8 : 218;
+            const usableWidth = sourceWl ? sourceWl.lineWidth - sourceWl.START_NODE_WIDTH - 8 : 500;
+            const position = Math.max(0.05, Math.min(0.95, (this._dragSourceX - usableStart) / usableWidth));
+            this.onCNOTCreate(sourceIdx, targetIdx, position);
+          }
+          break;
         }
-        break;
       }
+
+      this._dragActive = false;
+      this._linePointerDown = null;
+      this._dragThread.clear();
+      return;
     }
 
-    this._dragActive = false;
-    this._dragThread.clear();
+    // 2. If it was a quick click on the line track -> place an H gate!
+    if (this._linePointerDown) {
+      const elapsed = Date.now() - this._linePointerDown.time;
+      if (elapsed < 400) {
+        const posFraction = (this._linePointerDown.clickX - this._linePointerDown.startX) / this._linePointerDown.totalWidth;
+        const position = Math.max(0.05, Math.min(0.95, posFraction));
+        this.onPlaceGate(this._linePointerDown.qubitId, position);
+      }
+      this._linePointerDown = null;
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════════
