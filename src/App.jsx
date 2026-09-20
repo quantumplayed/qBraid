@@ -446,7 +446,7 @@ export default function App() {
       {/* ── Top Navigation Bar ────────────────────────────────────────── */}
       <header className="bg-white/95 backdrop-blur-md border-b border-slate-200 px-5 py-3 flex items-center justify-between z-20 shadow-sm relative">
         {/* Branding (Left) */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3.5">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 p-[1.5px] shadow-md shadow-sky-500/20 flex items-center justify-center">
             <div className="w-full h-full bg-white rounded-[10px] flex items-center justify-center text-sky-600 font-mono font-bold text-base">
               Ψ
@@ -460,6 +460,19 @@ export default function App() {
               Consistent Quantum Multiverse Story Engine
             </p>
           </div>
+
+          {/* Prominent "Start Here" Tutorial Button */}
+          <button
+            onClick={() => {
+              setShowTutorial(true);
+              setTutorialStep(1);
+            }}
+            className="ml-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white font-sans text-xs font-bold shadow-md shadow-orange-500/20 flex items-center gap-1.5 transition-all active:scale-[0.97] hover:shadow-lg cursor-pointer animate-pulse hover:animate-none"
+            title="Start here! Interactive step-by-step tutorial: The Hero & The Dragon Quest"
+          >
+            <span>👉</span>
+            <span>Start Here! (Tutorial)</span>
+          </button>
         </div>
 
         {/* Primary CTA: Generate Story (Centered in Top Bar) */}

@@ -217,8 +217,9 @@ export default class Worldline extends PIXI.Container {
                 }
 
                 // Open context menu (slider + delete option)
-                const screenX = e.client?.x || e.global?.x || cx;
-                const screenY = e.client?.y || e.global?.y || cy;
+                const canvasRect = document.querySelector('canvas')?.getBoundingClientRect() || { left: 0, top: 0 };
+                const screenX = e.nativeEvent?.clientX ?? (canvasRect.left + (e.global?.x ?? cx));
+                const screenY = e.nativeEvent?.clientY ?? (canvasRect.top + (e.global?.y ?? cy));
                 this.emit('gate-contextmenu', {
                     qubitId: this.qubitId,
                     gateId: gate.id,
@@ -231,6 +232,7 @@ export default class Worldline extends PIXI.Container {
             hitArea.on('pointerdown', handleGateInteraction);
             hitArea.on('rightdown', handleGateInteraction);
             hitArea.on('rightclick', handleGateInteraction);
+            hitArea.on('click', handleGateInteraction);
 
             diamondContainer.addChild(hitArea);
             this.gateContainer.addChild(diamondContainer);
@@ -335,7 +337,7 @@ export default class Worldline extends PIXI.Container {
         cardHit.fill({ color: 0x000000, alpha: 0.001 });
         cardHit.roundRect(cardX, cardY, cardW, cardH, 8);
         cardHit.fill();
-        cardHit.interactive = true;
+        cardHit.eventMode = 'static';
         cardHit.cursor = 'pointer';
 
         cardHit.on('pointerover', () => {
@@ -379,7 +381,7 @@ export default class Worldline extends PIXI.Container {
 
         delContainer.addChild(delBg);
         delContainer.addChild(delText);
-        delContainer.interactive = true;
+        delContainer.eventMode = 'static';
         delContainer.cursor = 'pointer';
 
         delContainer.on('pointerover', () => {
@@ -416,15 +418,22 @@ export default class Worldline extends PIXI.Container {
         this.hitZone.rect(startX, this.lineY - 20, totalUsableWidth, 40);
         this.hitZone.fill();
 
-        this.hitZone.interactive = true;
-        this.hitZone.cursor = 'default';
+        this.hitZone.eventMode = 'static';
+        this.hitZone.cursor = 'crosshair';
 
         // Click vs drag: click places gate, drag starts connection thread
         this.hitZone.on('pointerdown', (e) => {
+            // Ignore right-click on the line
+            if (e.button === 2 || e.nativeEvent?.button === 2) return;
             this._pointerDownTime = Date.now();
             this._pointerDownX = e.global.x;
             this._pointerDownY = e.global.y;
             this._isDragging = false;
+            this.emit('line-down', {
+                qubitId: this.qubitId,
+                x: e.global.x,
+                y: this.lineY,
+            });
         });
 
         this.hitZone.on('pointermove', (e) => {
@@ -445,6 +454,7 @@ export default class Worldline extends PIXI.Container {
 
         this.hitZone.on('pointerup', (e) => {
             const elapsed = Date.now() - this._pointerDownTime;
+            const wasDown = this._pointerDownTime > 0;
             this._pointerDownTime = 0;
 
             // Ignore right-click events
@@ -453,7 +463,7 @@ export default class Worldline extends PIXI.Container {
                 return;
             }
 
-            if (!this._isDragging && elapsed < this._CLICK_MAX_MS) {
+            if (wasDown && !this._isDragging && elapsed < this._CLICK_MAX_MS) {
                 const clickX = e.global.x;
                 const isOnGate = this.gates.some(gate => {
                     const gateX = startX + gate.position * totalUsableWidth;

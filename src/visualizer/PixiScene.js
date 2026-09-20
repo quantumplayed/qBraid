@@ -84,23 +84,53 @@ export default class PixiScene {
       }
 
       this.container.appendChild(this.app.canvas);
-      this.app.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
       this.stage = this.app.stage;
+
+      // Reliable DOM contextmenu interception for right-clicking H gates
+      this.app.canvas.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const canvasRect = this.app.canvas.getBoundingClientRect();
+        const mouseX = e.clientX - canvasRect.left;
+        const mouseY = e.clientY - canvasRect.top;
+
+        for (const wl of this.worldlines) {
+          if (Math.abs(mouseY - wl.lineY) < 22) {
+            const usableStart = wl.lineX + wl.START_NODE_WIDTH + 8;
+            const totalUsableWidth = wl.lineWidth - wl.START_NODE_WIDTH - 8;
+            for (const gate of wl.gates) {
+              const gx = usableStart + gate.position * totalUsableWidth;
+              if (Math.abs(mouseX - gx) < 24) {
+                this.onGateContextMenu({
+                  qubitId: wl.qubitId,
+                  gateId: gate.id,
+                  gate,
+                  screenX: e.clientX,
+                  screenY: e.clientY,
+                });
+                return;
+              }
+            }
+          }
+        }
+      });
 
       // Layers (bottom to top: worldlines -> connections -> drag thread)
       this._worldlineLayer = new PIXI.Container();
       this.stage.addChild(this._worldlineLayer);
 
       this._connectionLayer = new PIXI.Container();
+      this._connectionLayer.eventMode = 'passive';
       this.stage.addChild(this._connectionLayer);
 
       this._dragThread = new PIXI.Graphics();
+      this._dragThread.eventMode = 'none';
       this.stage.addChild(this._dragThread);
 
+      this._potentialDrag = null;
       this._rebuildWorldlines();
 
-      // Stage-level pointer tracking
-      this.stage.interactive = true;
+      // Stage-level pointer tracking (Pixi v8 eventMode)
+      this.stage.eventMode = 'static';
       this.stage.hitArea = new PIXI.Rectangle(
         0, 0,
         this.container.clientWidth,
@@ -179,6 +209,9 @@ export default class PixiScene {
       });
 
       // Event listeners
+      wl.on('line-down', (data) => {
+        this._potentialDrag = data;
+      });
       wl.on('drag-start', (data) => this._onDragStart(data));
       wl.on('edit-narrative', (data) => {
         const qubit = this.qubits.find(q => q.id === data.qubitId);
@@ -233,25 +266,24 @@ export default class PixiScene {
     const plus = new PIXI.Text({
       text: '+',
       style: {
-        fontFamily: '"Inter", system-ui, sans-serif',
-        fontSize: 15,
-        fontWeight: 'bold',
+        fontFamily: '"Inter", monospace, sans-serif',
+        fontSize: 14,
         fill: 0x0284c7,
+        fontWeight: 'bold',
       },
     });
     plus.anchor.set(0.5, 0.5);
     plus.x = padding;
     plus.y = lastY;
 
-    // Label
+    // Label "Add Worldline"
     const label = new PIXI.Text({
-      text: 'Add Story Beat',
+      text: 'Add Story Worldline',
       style: {
         fontFamily: '"Inter", system-ui, sans-serif',
         fontSize: 11,
-        fontWeight: '600',
-        fill: 0x0f172a, // dark slate
-        letterSpacing: 0.5,
+        fill: 0x0284c7,
+        fontWeight: '500',
       },
     });
     label.x = padding + 18;
@@ -266,7 +298,7 @@ export default class PixiScene {
     hitZone.fill({ color: 0x000000, alpha: 0.001 });
     hitZone.rect(padding - 15, lastY - 15, 150, 30);
     hitZone.fill();
-    hitZone.interactive = true;
+    hitZone.eventMode = 'static';
     hitZone.cursor = 'pointer';
 
     hitZone.on('pointerover', () => {
@@ -283,7 +315,7 @@ export default class PixiScene {
       circle.setStrokeStyle({ width: 1.5, color: 0x0284c7, alpha: 0.8 });
       circle.circle(padding, lastY, 10);
       circle.stroke();
-      label.style.fill = 0x0f172a;
+      label.style.fill = 0x0369a1;
     });
     hitZone.on('pointerdown', (e) => {
       e.stopPropagation();
@@ -295,7 +327,7 @@ export default class PixiScene {
   }
 
   // ═══════════════════════════════════════════════════════════════════════
-  //  CONNECTIONS (inter-worldline CNOT gates)
+  //  ENTANGLEMENT CONNECTIONS
   // ═══════════════════════════════════════════════════════════════════════
 
   _drawConnections() {
@@ -318,6 +350,7 @@ export default class PixiScene {
       const isOdd = conn.parity === 'odd';
 
       const connContainer = new PIXI.Container();
+      connContainer.eventMode = 'passive';
 
       // Theme colors based on parity (Modern Bright)
       const strokeColor = isOdd ? 0xd97706 : 0x7c3aed; // Amber vs Royal Purple
@@ -327,6 +360,7 @@ export default class PixiScene {
       const textColor = isOdd ? 0xb45309 : 0x6d28d9;
 
       const g = new PIXI.Graphics();
+      g.eventMode = 'none';
 
       // Vertical line glow
       g.setStrokeStyle({ width: 5, color: glowColor, alpha: 0.5 });
@@ -403,7 +437,7 @@ export default class PixiScene {
       badgeContainer.addChild(badgeText);
 
       // Interactive toggle hit area for parity badge
-      badgeGraphics.interactive = true;
+      badgeGraphics.eventMode = 'static';
       badgeGraphics.cursor = 'pointer';
 
       const connId = conn.id;
@@ -444,7 +478,7 @@ export default class PixiScene {
 
       delContainer.addChild(delBg);
       delContainer.addChild(delText);
-      delContainer.interactive = true;
+      delContainer.eventMode = 'static';
       delContainer.cursor = 'pointer';
 
       delContainer.on('pointerover', () => {
@@ -482,6 +516,16 @@ export default class PixiScene {
     this._cursorX = e.global.x;
     this._cursorY = e.global.y;
 
+    // Check if dragging started from potential drag
+    if (this._potentialDrag && !this._dragActive) {
+      const dx = this._cursorX - this._potentialDrag.x;
+      const dy = this._cursorY - this._potentialDrag.y;
+      if (Math.sqrt(dx * dx + dy * dy) > 5) {
+        this._onDragStart(this._potentialDrag);
+        this._potentialDrag = null;
+      }
+    }
+
     for (const wl of this.worldlines) {
       const isNear = wl.isNearY(this._cursorY);
       wl.setHover(this._cursorX, isNear && !this._dragActive);
@@ -508,6 +552,7 @@ export default class PixiScene {
   }
 
   _onPointerUp(_e) {
+    this._potentialDrag = null;
     if (!this._dragActive) return;
 
     for (const wl of this.worldlines) {
