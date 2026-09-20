@@ -9,6 +9,7 @@ export default function StoryGeneratorModal({
     simulator,
     qubits,
     connections,
+    initialStateIndex = null,
     onClose
 }) {
     const [sampledState, setSampledState] = useState(null);
@@ -91,8 +92,8 @@ export default function StoryGeneratorModal({
 
     // Initial sample on mount
     useEffect(() => {
-        sampleNew();
-    }, []);
+        sampleNew(initialStateIndex);
+    }, [initialStateIndex]);
 
     // Helper to generate flowing prose
     const generatedProse = useMemo(() => {

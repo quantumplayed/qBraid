@@ -5,6 +5,7 @@ import StoryGeneratorModal from './components/StoryGeneratorModal';
 import StateDistributionModal from './components/StateDistributionModal';
 import StoryBeatsModal from './components/StoryBeatsModal';
 import NarrativeModal from './components/NarrativeModal';
+import NarrativesSidebar from './components/NarrativesSidebar';
 import GateSliderOverlay from './components/GateSliderOverlay';
 import AboutModal from './components/AboutModal';
 import QuantumBackendModal from './components/QuantumBackendModal';
@@ -84,8 +85,10 @@ export default function App() {
   const [connections, setConnections] = useState(DEFAULT_PRESETS.triad.connections);
   const [simulator] = useState(() => new QuantumSimulator(10));
 
-  // Modals state
+  // Modals & Sidebar state
+  const [showNarrativesSidebar, setShowNarrativesSidebar] = useState(false);
   const [showStoryGenerator, setShowStoryGenerator] = useState(false);
+  const [storyGeneratorInitialState, setStoryGeneratorInitialState] = useState(null);
   const [showStateDistribution, setShowStateDistribution] = useState(false);
   const [showStoryBeats, setShowStoryBeats] = useState(false);
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
@@ -167,6 +170,16 @@ export default function App() {
   }, [simulator, allEvents, scrubberPosition, qubits.length]);
 
   const hasPhaseInterference = sliceInfo.hasPhaseInterference;
+
+  // Active timeline count (non-zero branches at current evaluation)
+  const activeTimelineCount = useMemo(() => {
+    return sliceInfo?.activeBranches?.length || 1;
+  }, [sliceInfo]);
+
+  const handleOpenStoryGeneratorForBranch = useCallback((branchIndex = null) => {
+    setStoryGeneratorInitialState(branchIndex);
+    setShowStoryGenerator(true);
+  }, []);
 
   // Simulator: compute per-qubit uncertainty & state distribution from slice
   const { qubitUncertainty, probabilities } = useMemo(() => {
@@ -487,6 +500,27 @@ export default function App() {
 
         {/* Action Controls (Right) */}
         <div className="flex items-center gap-2.5">
+          {/* Possible Narratives Sidebar Toggle Button */}
+          <button
+            onClick={() => setShowNarrativesSidebar(prev => !prev)}
+            className={`px-3 py-1.5 rounded-xl border text-xs font-medium transition-all flex items-center gap-1.5 shadow-xs cursor-pointer ${
+              showNarrativesSidebar
+                ? 'bg-sky-50 border-sky-300 text-sky-800 ring-2 ring-sky-400/20 font-semibold'
+                : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
+            }`}
+            title="Toggle Possible Narratives Multiverse Sidebar"
+          >
+            <span>📖</span>
+            <span>Possible Narratives</span>
+            <span
+              className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full ${
+                showNarrativesSidebar ? 'bg-sky-200 text-sky-900' : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              {activeTimelineCount}
+            </span>
+          </button>
+
           {/* Unsaved Indicator Badge */}
           {isDirty && (
             <span
@@ -641,42 +675,73 @@ export default function App() {
       </header>
 
       {/* ── Main Canvas Viewport ──────────────────────────────────────── */}
-      <main className="flex-1 relative overflow-hidden bg-slate-50">
-        <PixiWorldlineCanvas
-          qubits={qubits}
-          connections={connections}
-          qubitUncertainty={qubitUncertainty}
-          hasPhaseInterference={hasPhaseInterference}
-          scrubberPosition={scrubberPosition}
-          sliceInfo={sliceInfo}
-          onScrubberChange={(pos) => setScrubberPosition(pos)}
-          onCNOTCreate={addConnection}
-          onToggleConnectionParity={handleToggleConnectionParity}
-          onEditQubit={(qubit) => setSelectedQubit(qubit)}
-          onPlaceGate={handlePlaceGate}
-          onRemoveGate={handleRemoveGateDirect}
-          onGateContextMenu={setEditingGate}
-          onEditGate={handleEditGate}
-          onRemoveConnection={handleRemoveConnection}
-          onRemoveWorldline={removeWorldlineById}
-          onAddWorldline={addWorldline}
-        />
+      <main className="flex-1 relative overflow-hidden bg-slate-50 flex flex-row">
+        <div className="flex-1 relative h-full overflow-hidden">
+          <PixiWorldlineCanvas
+            qubits={qubits}
+            connections={connections}
+            qubitUncertainty={qubitUncertainty}
+            hasPhaseInterference={hasPhaseInterference}
+            scrubberPosition={scrubberPosition}
+            sliceInfo={sliceInfo}
+            onScrubberChange={(pos) => setScrubberPosition(pos)}
+            onCNOTCreate={addConnection}
+            onToggleConnectionParity={handleToggleConnectionParity}
+            onEditQubit={(qubit) => setSelectedQubit(qubit)}
+            onPlaceGate={handlePlaceGate}
+            onRemoveGate={handleRemoveGateDirect}
+            onGateContextMenu={setEditingGate}
+            onEditGate={handleEditGate}
+            onRemoveConnection={handleRemoveConnection}
+            onRemoveWorldline={removeWorldlineById}
+            onAddWorldline={addWorldline}
+          />
 
-        {/* Floating Quick Action Badge */}
-        <div className="absolute top-4 left-6 pointer-events-none flex items-center gap-2">
-          <span className="text-[11px] font-sans font-medium text-slate-600 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-slate-200/90 shadow-md flex items-center gap-2">
-            <span>💡</span>
-            <span><strong className="text-sky-700 font-semibold">Click Beat Card</strong> to edit narrative</span>
-            <span className="text-slate-300">·</span>
-            <span><strong className="text-sky-700 font-semibold">Click line</strong> to place H-Gate</span>
-            <span className="text-slate-300">·</span>
-            <span><strong className="text-indigo-600 font-semibold">Right-click H-Gate</strong> for bias & delete menu</span>
-            <span className="text-slate-300">·</span>
-            <span><strong className="text-purple-700 font-semibold">Drag line-to-line</strong> to Entangle</span>
-            <span className="text-slate-300">·</span>
-            <span><strong className="text-amber-700 font-semibold">Click Parity Badge</strong> to toggle Even/Odd</span>
-          </span>
+          {/* Floating Quick Action Badge */}
+          <div className="absolute top-4 left-6 pointer-events-none flex items-center gap-2">
+            <span className="text-[11px] font-sans font-medium text-slate-600 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-slate-200/90 shadow-md flex items-center gap-2">
+              <span>💡</span>
+              <span><strong className="text-sky-700 font-semibold">Click Beat Card</strong> to edit narrative</span>
+              <span className="text-slate-300">·</span>
+              <span><strong className="text-sky-700 font-semibold">Click line</strong> to place H-Gate</span>
+              <span className="text-slate-300">·</span>
+              <span><strong className="text-indigo-600 font-semibold">Right-click H-Gate</strong> for bias & delete menu</span>
+              <span className="text-slate-300">·</span>
+              <span><strong className="text-purple-700 font-semibold">Drag line-to-line</strong> to Entangle</span>
+              <span className="text-slate-300">·</span>
+              <span><strong className="text-amber-700 font-semibold">Click Parity Badge</strong> to toggle Even/Odd</span>
+            </span>
+          </div>
+
+          {/* Floating Edge Dock Tab (When Sidebar is Closed) */}
+          {!showNarrativesSidebar && (
+            <button
+              onClick={() => setShowNarrativesSidebar(true)}
+              className="absolute top-4 right-0 z-10 bg-white/95 hover:bg-sky-50 text-slate-700 hover:text-sky-800 px-3 py-2 rounded-l-xl border-y border-l border-slate-200 shadow-md flex items-center gap-2 text-xs font-semibold transition-all cursor-pointer group"
+              title="Open Possible Narratives Sidebar"
+            >
+              <span>📖</span>
+              <span>Possible Narratives</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-800 group-hover:bg-sky-200">
+                {activeTimelineCount}
+              </span>
+              <span className="text-slate-400 group-hover:text-slate-600">◀</span>
+            </button>
+          )}
         </div>
+
+        {/* ── Toggle-able Possible Narratives Sidebar ───────────────────── */}
+        {showNarrativesSidebar && (
+          <NarrativesSidebar
+            simulator={simulator}
+            qubits={qubits}
+            connections={connections}
+            scrubberPosition={scrubberPosition}
+            sliceInfo={sliceInfo}
+            onOpenStoryGenerator={handleOpenStoryGeneratorForBranch}
+            onClose={() => setShowNarrativesSidebar(false)}
+          />
+        )}
       </main>
 
       {/* ── Footer Status Bar ────────────────────────────────────────── */}
@@ -721,7 +786,11 @@ export default function App() {
           simulator={simulator}
           qubits={qubits}
           connections={connections}
-          onClose={() => setShowStoryGenerator(false)}
+          initialStateIndex={storyGeneratorInitialState}
+          onClose={() => {
+            setShowStoryGenerator(false);
+            setStoryGeneratorInitialState(null);
+          }}
         />
       )}
 
