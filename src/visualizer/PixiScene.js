@@ -418,11 +418,20 @@ export default class PixiScene {
       const badgeHeight = 24;
 
       const badgeGraphics = new PIXI.Graphics();
-      badgeGraphics.fill({ color: badgeBg, alpha: 0.98 });
-      badgeGraphics.setStrokeStyle({ width: 1.5, color: badgeBorder, alpha: 1 });
-      badgeGraphics.roundRect(-badgeWidth / 2, -badgeHeight / 2, badgeWidth, badgeHeight, 12);
-      badgeGraphics.fill();
-      badgeGraphics.stroke();
+      const renderBadge = (isHover) => {
+        badgeGraphics.clear();
+        badgeGraphics.fill({ color: isHover ? (isOdd ? 0xfffbeb : 0xf5f3ff) : badgeBg, alpha: 0.98 });
+        badgeGraphics.setStrokeStyle({
+          width: isHover ? 2 : 1.5,
+          color: isHover ? (isOdd ? 0xb45309 : 0x5b21b6) : badgeBorder,
+          alpha: 1,
+        });
+        badgeGraphics.roundRect(-badgeWidth / 2, -badgeHeight / 2, badgeWidth, badgeHeight, 12);
+        badgeGraphics.fill();
+        badgeGraphics.stroke();
+      };
+      renderBadge(false);
+      badgeGraphics.eventMode = 'none';
       badgeContainer.addChild(badgeGraphics);
 
       const badgeText = new PIXI.Text({
@@ -436,24 +445,27 @@ export default class PixiScene {
         },
       });
       badgeText.anchor.set(0.5, 0.5);
+      badgeText.eventMode = 'none';
       badgeContainer.addChild(badgeText);
 
-      // Interactive toggle hit area for parity badge
-      badgeGraphics.eventMode = 'static';
-      badgeGraphics.cursor = 'pointer';
+      // Interactive toggle hit area on badgeContainer
+      badgeContainer.eventMode = 'static';
+      badgeContainer.cursor = 'pointer';
+      badgeContainer.hitArea = new PIXI.Rectangle(-badgeWidth / 2 - 4, -badgeHeight / 2 - 4, badgeWidth + 8, badgeHeight + 8);
 
       const connId = conn.id;
-      badgeGraphics.on('pointerdown', (e) => {
+      badgeContainer.on('pointerdown', (e) => {
         e.stopPropagation();
+        this._linePointerDown = null;
+        this._potentialDrag = null;
+        this._dragActive = false;
         this.onToggleConnectionParity(connId);
       });
-      badgeGraphics.on('pointerover', () => {
-        badgeGraphics.setStrokeStyle({ width: 2, color: isOdd ? 0xb45309 : 0x5b21b6, alpha: 1 });
-        badgeGraphics.stroke();
+      badgeContainer.on('pointerover', () => {
+        renderBadge(true);
       });
-      badgeGraphics.on('pointerout', () => {
-        badgeGraphics.setStrokeStyle({ width: 1.5, color: badgeBorder, alpha: 1 });
-        badgeGraphics.stroke();
+      badgeContainer.on('pointerout', () => {
+        renderBadge(false);
       });
 
       // Small Delete Button (✕) next to the badge
@@ -462,11 +474,17 @@ export default class PixiScene {
       delContainer.y = midY;
 
       const delBg = new PIXI.Graphics();
-      delBg.fill({ color: 0xffffff, alpha: 0.98 });
-      delBg.setStrokeStyle({ width: 1, color: 0xcbd5e1, alpha: 1 });
-      delBg.circle(0, 0, 8);
-      delBg.fill();
-      delBg.stroke();
+      const renderDel = (isHover) => {
+        delBg.clear();
+        delBg.fill({ color: isHover ? 0xef4444 : 0xffffff, alpha: isHover ? 1 : 0.98 });
+        delBg.setStrokeStyle({ width: 1, color: isHover ? 0xef4444 : 0xcbd5e1, alpha: 1 });
+        delBg.circle(0, 0, 8);
+        delBg.fill();
+        delBg.stroke();
+      };
+      renderDel(false);
+      delBg.eventMode = 'none';
+      delContainer.addChild(delBg);
 
       const delText = new PIXI.Text({
         text: '✕',
@@ -477,30 +495,26 @@ export default class PixiScene {
         },
       });
       delText.anchor.set(0.5, 0.5);
-
-      delContainer.addChild(delBg);
+      delText.eventMode = 'none';
       delContainer.addChild(delText);
+
       delContainer.eventMode = 'static';
       delContainer.cursor = 'pointer';
+      delContainer.hitArea = new PIXI.Circle(0, 0, 10);
 
       delContainer.on('pointerover', () => {
-        delBg.clear();
-        delBg.fill({ color: 0xef4444, alpha: 1 });
-        delBg.circle(0, 0, 8);
-        delBg.fill();
+        renderDel(true);
         delText.style.fill = 0xffffff;
       });
       delContainer.on('pointerout', () => {
-        delBg.clear();
-        delBg.fill({ color: 0xffffff, alpha: 0.98 });
-        delBg.setStrokeStyle({ width: 1, color: 0xcbd5e1, alpha: 1 });
-        delBg.circle(0, 0, 8);
-        delBg.fill();
-        delBg.stroke();
+        renderDel(false);
         delText.style.fill = 0x64748b;
       });
       delContainer.on('pointerdown', (e) => {
         e.stopPropagation();
+        this._linePointerDown = null;
+        this._potentialDrag = null;
+        this._dragActive = false;
         this.onRemoveConnection(connId);
       });
 
@@ -508,6 +522,39 @@ export default class PixiScene {
       connContainer.addChild(delContainer);
       this._connectionLayer.addChild(connContainer);
     }
+  }
+
+  _isNearConnection(x, y) {
+    for (const conn of this.connections) {
+      if (conn.type !== 'CNOT') continue;
+      const controlWl = this.worldlines[conn.control];
+      const targetWl = this.worldlines[conn.target];
+      if (!controlWl || !targetWl) continue;
+
+      const pos = conn.position ?? 0.5;
+      const usableStart = controlWl.lineX + (controlWl.START_NODE_WIDTH || 130) + 8;
+      const usableWidth = controlWl.lineWidth - (controlWl.START_NODE_WIDTH || 130) - 8;
+      const cx = usableStart + usableWidth * pos;
+      const midY = (controlWl.lineY + targetWl.lineY) / 2;
+
+      // Parity badge: 90x24 at (cx, midY). Generous hit check
+      if (Math.abs(x - cx) <= 55 && Math.abs(y - midY) <= 18) {
+        return true;
+      }
+      // Delete button: radius 8 at cx + 45 + 14 = cx + 59
+      if (Math.abs(x - (cx + 59)) <= 16 && Math.abs(y - midY) <= 16) {
+        return true;
+      }
+      // Vertical connection line and control/target endpoints
+      if (Math.abs(x - cx) <= 14) {
+        const minY = Math.min(controlWl.lineY, targetWl.lineY) - 12;
+        const maxY = Math.max(controlWl.lineY, targetWl.lineY) + 12;
+        if (y >= minY && y <= maxY) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -520,6 +567,12 @@ export default class PixiScene {
 
     const x = e.global.x;
     const y = e.global.y;
+
+    // Do NOT place gates or start drags if clicking any CNOT connection element
+    if (this._isNearConnection(x, y)) {
+      this._linePointerDown = null;
+      return;
+    }
 
     // Check if clicked near any worldline track
     for (let i = 0; i < this.worldlines.length; i++) {
@@ -597,8 +650,9 @@ export default class PixiScene {
       }
     }
 
+    const nearConnection = this._isNearConnection(this._cursorX, this._cursorY);
     for (const wl of this.worldlines) {
-      const isNear = wl.isNearY(this._cursorY);
+      const isNear = wl.isNearY(this._cursorY) && !nearConnection;
       wl.setHover(this._cursorX, isNear && !this._dragActive);
     }
 
