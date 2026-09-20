@@ -46,7 +46,32 @@ Backed by [`@quantumplayed/quantum-game-engine`](https://www.npmjs.com/package/@
 - Includes quick character presets (The Scout, The Artifact, The Betrayer, The Storm, The AI Oracle).
 - Clicking any worldline's glowing start dot opens a quick-edit dialog.
 
-### 6. Native QuDit Architecture
+### 6. Save, Load & Demo Story Hub
+- **Export Universe to JSON**: Download the current universe as a portable JSON file or copy it straight to your clipboard.
+- **Import / Drag & Drop**: Drop or paste any project JSON to instantly restore timelines.
+- **Curated Demo Stories**:
+  - *The Hero & The Dragon* (Tutorial Quest)
+  - *Triad of Fate* (Alliance & Conflict)
+  - *The Midnight Heist* (4-Qubit Cyberpunk Spire)
+  - *10-Qubit Deep Multiverse* (1,024 Parallel Universes)
+- **Unsaved Changes Progress Guard**: Automatically warns the user with a confirmation dialog before loading a story or navigating away if there are unsaved modifications.
+
+### 7. Interactive 8-Step Tutorial ("The Hero & The Dragon")
+- An in-app floating interactive guide taking creators from a blank canvas to an entangled narrative multiverse:
+  1. *Clean Slate*: 2 empty qubit worldlines.
+  2. *Story Arc 1*: Configure "The Hero" (adventure vs home).
+  3. *Story Arc 2*: Configure "The Dragon" (flees vs burns village).
+  4. *Uncertainty*: Apply Hadamard ($H$) gate on the Hero for 50/50 branching.
+  5. *Consistency*: Entangle Hero & Dragon with an Even Parity CNOT.
+  6. *Multiverse Collapse*: Inspect the 2 coherent timelines in the Story Generator.
+  7. *Deepening Narrative*: Co-create a 3rd beat ("The Magic Sword").
+  8. *Preservation*: Save the project and explore demo stories.
+
+### 8. Game Engine Integration (Ink / Inky) & Quantum Hardware
+- **Direct `.ink` Export**: One-click export that generates complete, ready-to-run Ink files with knot branches, diversion choices, and parity weave assertions.
+- **Live QPU Backend Selector**: Configure live execution against real hardware backends, starting with **Quantum Inspire** (TU Delft QX emulator & Starmon-5 transmon QPU).
+
+### 9. Native QuDit Architecture
 - Built on `@quantumplayed/quantum-game-engine`, where every entity possesses a generalized `dimension` ($d \ge 2$).
 - Qubits ($d=2$) map to binary active/passive branches; the architecture naturally extends to $d$-ary qudits (e.g. 3-state qutrits for Win / Draw / Loss).
 

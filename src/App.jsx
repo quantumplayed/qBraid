@@ -8,7 +8,12 @@ import NarrativeModal from './components/NarrativeModal';
 import GateSliderOverlay from './components/GateSliderOverlay';
 import AboutModal from './components/AboutModal';
 import QuantumBackendModal from './components/QuantumBackendModal';
+import SaveLoadModal from './components/SaveLoadModal';
+import UnsavedChangesPrompt from './components/UnsavedChangesPrompt';
+import TutorialGuide from './components/TutorialGuide';
 import { downloadInkFile } from './utils/inkExporter';
+import { downloadProjectFile } from './utils/projectStorage';
+import { useEffect } from 'react';
 
 const MAX_WORLDLINES = 10;
 
@@ -103,6 +108,29 @@ export default function App() {
   const [selectedQubit, setSelectedQubit] = useState(null);
   const [editingGate, setEditingGate] = useState(null); // { qubitId, gateId, gate, screenX, screenY }
 
+  // Save / Load / Tutorial / Progress Guard states
+  const [isDirty, setIsDirty] = useState(false);
+  const [showSaveLoadModal, setShowSaveLoadModal] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(1);
+  const [unsavedPromptState, setUnsavedPromptState] = useState({
+    isOpen: false,
+    pendingAction: null,
+    actionName: 'load another story',
+  });
+
+  // Guard against closing/refreshing tab with unsaved work
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDirty]);
+
   // ── Simulator: compute per-qubit uncertainty & state distribution ───────
   const { qubitUncertainty, probabilities } = useMemo(() => {
     simulator.reset();
@@ -166,6 +194,7 @@ export default function App() {
       position,
       parity,
     }]);
+    setIsDirty(true);
   }, []);
 
   const handleToggleConnectionParity = useCallback((connId) => {
@@ -174,14 +203,17 @@ export default function App() {
       const newParity = c.parity === 'odd' ? 'even' : 'odd';
       return { ...c, parity: newParity };
     }));
+    setIsDirty(true);
   }, []);
 
   const handleRemoveConnection = useCallback((connId) => {
     setConnections(prev => prev.filter(c => c.id !== connId));
+    setIsDirty(true);
   }, []);
 
   const updateQubit = useCallback((updatedQubit) => {
     setQubits(prev => prev.map(q => q.id === updatedQubit.id ? updatedQubit : q));
+    setIsDirty(true);
   }, []);
 
   const handlePlaceGate = useCallback((qubitId, position) => {
@@ -195,6 +227,7 @@ export default function App() {
       };
       return { ...q, gates: [...(q.gates || []), newGate] };
     }));
+    setIsDirty(true);
   }, []);
 
   const handleEditGate = useCallback((data) => {
@@ -213,6 +246,7 @@ export default function App() {
       };
     }));
     setEditingGate(prev => prev ? { ...prev, gate: { ...prev.gate, theta } } : null);
+    setIsDirty(true);
   }, [editingGate]);
 
   const handleRemoveGateDirect = useCallback((qubitId, gateId) => {
@@ -226,6 +260,7 @@ export default function App() {
     if (editingGate?.gateId === gateId) {
       setEditingGate(null);
     }
+    setIsDirty(true);
   }, [editingGate]);
 
   const handleRemoveGate = useCallback(() => {
@@ -245,6 +280,7 @@ export default function App() {
         gates: [],
       }];
     });
+    setIsDirty(true);
   }, []);
 
   const removeWorldlineById = useCallback((qubitId) => {
@@ -265,20 +301,144 @@ export default function App() {
       );
       return prev.filter(q => q.id !== qubitId);
     });
+    setIsDirty(true);
   }, []);
 
   const resetCircuit = useCallback(() => {
     setConnections([]);
     setQubits(prev => prev.map(q => ({ ...q, gates: [] })));
     setEditingGate(null);
+    setIsDirty(true);
+  }, []);
+
+  // Guard action when there are unsaved changes
+  const requestActionWithGuard = useCallback((action, actionName = 'load another story') => {
+    if (isDirty) {
+      setUnsavedPromptState({
+        isOpen: true,
+        pendingAction: action,
+        actionName,
+      });
+    } else {
+      action();
+    }
+  }, [isDirty]);
+
+  const handlePromptDiscard = () => {
+    const action = unsavedPromptState.pendingAction;
+    setUnsavedPromptState({ isOpen: false, pendingAction: null, actionName: '' });
+    setIsDirty(false);
+    if (action) action();
+  };
+
+  const handlePromptSaveAndProceed = () => {
+    downloadProjectFile(qubits, connections, 'My Narrative Story');
+    const action = unsavedPromptState.pendingAction;
+    setUnsavedPromptState({ isOpen: false, pendingAction: null, actionName: '' });
+    setIsDirty(false);
+    if (action) action();
+  };
+
+  const handlePromptCancel = () => {
+    setUnsavedPromptState({ isOpen: false, pendingAction: null, actionName: '' });
+  };
+
+  const handleLoadProject = useCallback((projectData) => {
+    setQubits(projectData.qubits);
+    setConnections(projectData.connections);
+    setEditingGate(null);
+    setIsDirty(false);
   }, []);
 
   const loadPreset = (presetKey) => {
     const preset = DEFAULT_PRESETS[presetKey];
     if (!preset) return;
-    setQubits(preset.qubits);
-    setConnections(preset.connections);
-    setEditingGate(null);
+    requestActionWithGuard(() => {
+      setQubits(preset.qubits);
+      setConnections(preset.connections);
+      setEditingGate(null);
+      setIsDirty(false);
+    }, `load preset "${preset.name}"`);
+  };
+
+  // ── Tutorial Step Dispatcher ──────────────────────────────────────────
+  const handleTutorialStepAction = (actionType) => {
+    if (actionType === 'RESET_2_QUBITS') {
+      requestActionWithGuard(() => {
+        setQubits([
+          { id: 'q0', name: 'Story Line 1', active: 'Hero goes on adventure', passive: 'Hero stays at home', gates: [] },
+          { id: 'q1', name: 'Story Line 2', active: 'Dragon flees', passive: 'Dragon destroys village', gates: [] },
+        ]);
+        setConnections([]);
+        setEditingGate(null);
+        setIsDirty(true);
+      }, 'reset to tutorial worldlines');
+    } else if (actionType === 'SET_HERO_BEAT') {
+      setQubits(prev => prev.map((q, idx) => idx === 0 ? {
+        ...q,
+        name: 'The Hero',
+        active: 'Goes on adventure',
+        passive: 'Stays at home',
+      } : q));
+      setIsDirty(true);
+    } else if (actionType === 'SET_DRAGON_BEAT') {
+      setQubits(prev => prev.map((q, idx) => idx === 1 ? {
+        ...q,
+        name: 'The Dragon',
+        active: 'Flees across the burning horizon',
+        passive: 'Destroys the defenseless village',
+      } : q));
+      setIsDirty(true);
+    } else if (actionType === 'ADD_H_GATE') {
+      setQubits(prev => prev.map((q, idx) => idx === 0 ? {
+        ...q,
+        gates: [
+          ...(q.gates || []).filter(g => Math.abs(g.position - 0.25) > 0.05),
+          { id: `h-${Date.now()}`, type: 'Ry', theta: Math.PI / 2, position: 0.25 },
+        ]
+      } : q));
+      setIsDirty(true);
+    } else if (actionType === 'ADD_CNOT') {
+      setConnections(prev => {
+        const filtered = prev.filter(c => !(c.control === 0 && c.target === 1));
+        return [...filtered, {
+          id: `cnot-hero-dragon-${Date.now()}`,
+          type: 'CNOT',
+          control: 0,
+          target: 1,
+          position: 0.55,
+          parity: 'even',
+        }];
+      });
+      setIsDirty(true);
+    } else if (actionType === 'ADD_MAGIC_SWORD') {
+      setQubits(prev => {
+        const hasSword = prev.some(q => q.name.includes('Sword') || q.name.includes('Blade'));
+        if (hasSword) return prev;
+        const newSword = {
+          id: `q-sword-${Date.now()}`,
+          name: 'The Magic Sword',
+          active: 'Hero draws the radiant Sunblade',
+          passive: 'Blade remains trapped in stone',
+          gates: [],
+        };
+        return [...prev, newSword];
+      });
+      setConnections(prev => {
+        const targetIdx = 2;
+        const hasConn = prev.some(c => c.control === 0 && c.target === targetIdx);
+        if (hasConn) return prev;
+        return [...prev, {
+          id: `cnot-hero-sword-${Date.now()}`,
+          type: 'CNOT',
+          control: 0,
+          target: targetIdx,
+          position: 0.75,
+          parity: 'even',
+        }];
+      });
+      setIsDirty(true);
+    }
   };
 
   const totalGates = qubits.reduce((sum, q) => sum + (q.gates?.length || 0), 0);
@@ -333,6 +493,41 @@ export default function App() {
 
         {/* Action Controls */}
         <div className="flex items-center gap-2.5">
+          {/* Unsaved Indicator Badge */}
+          {isDirty && (
+            <span
+              className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg flex items-center gap-1 shadow-xs cursor-pointer hover:bg-amber-100 transition-colors"
+              onClick={() => setShowSaveLoadModal(true)}
+              title="You have unsaved changes. Click to Save."
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
+              <span>Unsaved</span>
+            </span>
+          )}
+
+          {/* Interactive Tutorial Button */}
+          <button
+            onClick={() => {
+              setShowTutorial(true);
+              setTutorialStep(1);
+            }}
+            className="px-3 py-1.5 rounded-xl border border-sky-200 bg-sky-50/80 hover:bg-sky-100 text-sky-800 text-xs font-semibold transition-all flex items-center gap-1.5 shadow-xs active:scale-[0.98]"
+            title="Start step-by-step tutorial: Build The Hero & The Dragon Story"
+          >
+            <span>🎓</span>
+            <span>Tutorial</span>
+          </button>
+
+          {/* Save & Load Button */}
+          <button
+            onClick={() => setShowSaveLoadModal(true)}
+            className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all flex items-center gap-1.5 shadow-xs active:scale-[0.98]"
+            title="Export JSON, load projects, or explore demo stories"
+          >
+            <span>💾</span>
+            <span>Save & Load</span>
+          </button>
+
           {/* Primary CTA: Story Generator */}
           <button
             onClick={() => setShowStoryGenerator(true)}
@@ -403,8 +598,22 @@ export default function App() {
 
                   {/* Tools Header */}
                   <div className="px-3.5 py-1 text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold">
-                    Multiverse Tools
+                    Project & Tools
                   </div>
+                  <button
+                    onClick={() => { setShowSaveLoadModal(true); setShowOverflowMenu(false); }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 transition-colors font-medium"
+                  >
+                    <span>💾</span>
+                    <span>Save & Load Project Hub</span>
+                  </button>
+                  <button
+                    onClick={() => { setShowTutorial(true); setTutorialStep(1); setShowOverflowMenu(false); }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-sky-700 transition-colors font-medium"
+                  >
+                    <span>🎓</span>
+                    <span>Interactive 8-Step Tutorial</span>
+                  </button>
                   <button
                     onClick={() => { setShowStoryBeats(true); setShowOverflowMenu(false); }}
                     className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 transition-colors font-medium"
@@ -452,7 +661,12 @@ export default function App() {
 
                   {/* Reset */}
                   <button
-                    onClick={() => { resetCircuit(); setShowOverflowMenu(false); }}
+                    onClick={() => {
+                      requestActionWithGuard(() => {
+                        resetCircuit();
+                        setShowOverflowMenu(false);
+                      }, 'reset all gates & connections');
+                    }}
                     className="w-full text-left px-3.5 py-2 hover:bg-rose-50 text-rose-600 flex items-center gap-2 transition-colors font-medium"
                   >
                     <span>↺</span>
@@ -613,6 +827,37 @@ export default function App() {
           onClose={() => setShowBackendModal(false)}
         />
       )}
+
+      {/* Save & Load Story Universe Modal */}
+      <SaveLoadModal
+        isOpen={showSaveLoadModal}
+        onClose={() => setShowSaveLoadModal(false)}
+        qubits={qubits}
+        connections={connections}
+        onLoadProject={handleLoadProject}
+        isDirty={isDirty}
+        onTriggerUnsavedPrompt={(loadFn) => requestActionWithGuard(loadFn, 'load a new story')}
+      />
+
+      {/* Unsaved Changes Confirmation Prompt Modal */}
+      <UnsavedChangesPrompt
+        isOpen={unsavedPromptState.isOpen}
+        actionName={unsavedPromptState.actionName}
+        onCancel={handlePromptCancel}
+        onDiscard={handlePromptDiscard}
+        onSaveAndProceed={handlePromptSaveAndProceed}
+      />
+
+      {/* Interactive 8-Step Tutorial Floating Guide */}
+      <TutorialGuide
+        isOpen={showTutorial}
+        onClose={() => setShowTutorial(false)}
+        currentStep={tutorialStep}
+        onStepChange={(step) => setTutorialStep(step)}
+        onApplyStepAction={handleTutorialStepAction}
+        onOpenStoryModal={() => setShowStoryGenerator(true)}
+        onOpenSaveLoadModal={() => setShowSaveLoadModal(true)}
+      />
     </div>
   );
 }
