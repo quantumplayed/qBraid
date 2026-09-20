@@ -31,26 +31,26 @@ export default function GateSliderOverlay({ x, y, gate, onChange, onClose, onRem
                 top: `${Math.min(window.innerHeight - 250, y + 20)}px`,
             }}
         >
-            <div className="bg-slate-900/95 backdrop-blur-md border border-cyan-500/40 rounded-xl p-4 shadow-2xl shadow-cyan-950/50 w-72 text-slate-100">
+            <div className="bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl p-4 shadow-xl w-72 text-slate-800">
                 {/* Header */}
-                <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-700/60">
+                <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
                     <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
-                        <span className="font-semibold text-xs text-cyan-300 font-mono tracking-wider uppercase">
+                        <span className="w-2.5 h-2.5 rounded-full bg-sky-500 animate-pulse" />
+                        <span className="font-semibold text-xs text-sky-800 font-mono tracking-wider uppercase">
                             {isExactH ? 'Hadamard Gate (50/50)' : 'Uncertainty Bias'}
                         </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                         <button
                             onClick={onRemove}
-                            className="text-red-400 hover:text-red-300 hover:bg-red-950/40 px-1.5 py-0.5 rounded text-xs transition-colors"
+                            className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-1.5 py-0.5 rounded text-xs transition-colors font-medium"
                             title="Remove gate"
                         >
                             ✕
                         </button>
                         <button
                             onClick={onClose}
-                            className="text-slate-400 hover:text-white hover:bg-slate-800 px-1.5 py-0.5 rounded text-xs transition-colors"
+                            className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 px-1.5 py-0.5 rounded text-xs transition-colors"
                             title="Done"
                         >
                             ✓
@@ -61,18 +61,18 @@ export default function GateSliderOverlay({ x, y, gate, onChange, onClose, onRem
                 {/* Outcome Probabilities Display */}
                 <div className="space-y-1.5 mb-3">
                     <div className="flex justify-between text-xs font-mono">
-                        <span className="text-cyan-400 font-medium">Positive: {activePercent}%</span>
-                        <span className="text-purple-400 font-medium">Negative: {passivePercent}%</span>
+                        <span className="text-sky-700 font-semibold">Positive: {activePercent}%</span>
+                        <span className="text-purple-700 font-semibold">Negative: {passivePercent}%</span>
                     </div>
 
                     {/* Split Visual Bar */}
-                    <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden flex border border-slate-700/50">
+                    <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden flex border border-slate-200">
                         <div
-                            className="bg-gradient-to-r from-cyan-500 to-cyan-400 transition-all duration-150"
+                            className="bg-sky-500 transition-all duration-150"
                             style={{ width: `${activePercent}%` }}
                         />
                         <div
-                            className="bg-gradient-to-r from-purple-500 to-purple-600 transition-all duration-150"
+                            className="bg-purple-500 transition-all duration-150"
                             style={{ width: `${passivePercent}%` }}
                         />
                     </div>
@@ -86,18 +86,18 @@ export default function GateSliderOverlay({ x, y, gate, onChange, onClose, onRem
                         max="100"
                         value={activePercent}
                         onChange={(e) => setProbability(Number(e.target.value) / 100)}
-                        className="w-full accent-cyan-400 cursor-pointer h-1.5 bg-slate-800 rounded-lg appearance-none"
+                        className="w-full accent-sky-600 cursor-pointer h-1.5 bg-slate-200 rounded-lg appearance-none"
                     />
-                    <div className="flex justify-between text-[10px] text-slate-500 font-mono mt-1">
+                    <div className="flex justify-between text-[10px] text-slate-400 font-mono mt-1">
                         <span>0% (Passive)</span>
-                        <span className="text-cyan-400/80">50% (H)</span>
+                        <span className="text-sky-700 font-medium">50% (H)</span>
                         <span>100% (Active)</span>
                     </div>
                 </div>
 
                 {/* Quick Presets */}
                 <div className="space-y-1.5">
-                    <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
+                    <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block font-medium">
                         Presets
                     </span>
                     <div className="grid grid-cols-3 gap-1.5 text-xs font-mono">
@@ -106,8 +106,8 @@ export default function GateSliderOverlay({ x, y, gate, onChange, onClose, onRem
                             onClick={() => setProbability(0.5)}
                             className={`px-2 py-1 rounded text-center transition-all ${
                                 isExactH
-                                    ? 'bg-cyan-500/20 border border-cyan-400 text-cyan-300 font-bold'
-                                    : 'bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 border border-slate-700/50'
+                                    ? 'bg-sky-50 border border-sky-300 text-sky-800 font-bold shadow-sm'
+                                    : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200'
                             }`}
                             title="Default Hadamard 50/50 superposition"
                         >
@@ -116,7 +116,7 @@ export default function GateSliderOverlay({ x, y, gate, onChange, onClose, onRem
                         <button
                             type="button"
                             onClick={() => setProbability(0.75)}
-                            className="px-2 py-1 rounded text-center bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 border border-slate-700/50 transition-all"
+                            className="px-2 py-1 rounded text-center bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition-all"
                             title="75% Positive bias"
                         >
                             75 / 25
@@ -124,7 +124,7 @@ export default function GateSliderOverlay({ x, y, gate, onChange, onClose, onRem
                         <button
                             type="button"
                             onClick={() => setProbability(0.25)}
-                            className="px-2 py-1 rounded text-center bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 border border-slate-700/50 transition-all"
+                            className="px-2 py-1 rounded text-center bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition-all"
                             title="25% Positive bias"
                         >
                             25 / 75

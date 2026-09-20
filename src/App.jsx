@@ -195,17 +195,23 @@ export default function App() {
     setEditingGate(prev => prev ? { ...prev, gate: { ...prev.gate, theta } } : null);
   }, [editingGate]);
 
-  const handleRemoveGate = useCallback(() => {
-    if (!editingGate) return;
+  const handleRemoveGateDirect = useCallback((qubitId, gateId) => {
     setQubits(prev => prev.map(q => {
-      if (q.id !== editingGate.qubitId) return q;
+      if (q.id !== qubitId) return q;
       return {
         ...q,
-        gates: (q.gates || []).filter(g => g.id !== editingGate.gateId),
+        gates: (q.gates || []).filter(g => g.id !== gateId),
       };
     }));
-    setEditingGate(null);
+    if (editingGate?.gateId === gateId) {
+      setEditingGate(null);
+    }
   }, [editingGate]);
+
+  const handleRemoveGate = useCallback(() => {
+    if (!editingGate) return;
+    handleRemoveGateDirect(editingGate.qubitId, editingGate.gateId);
+  }, [editingGate, handleRemoveGateDirect]);
 
   const addWorldline = useCallback((customData) => {
     setQubits(prev => {
@@ -259,49 +265,49 @@ export default function App() {
   const totalStateSpace = Math.pow(2, qubits.length);
 
   return (
-    <div className="w-full h-screen bg-slate-950 flex flex-col select-none overflow-hidden font-sans">
+    <div className="w-full h-screen bg-slate-100 flex flex-col select-none overflow-hidden font-sans">
       {/* ── Top Navigation Bar ────────────────────────────────────────── */}
-      <header className="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-5 py-3 flex items-center justify-between gap-4 z-20">
+      <header className="bg-white/95 backdrop-blur-md border-b border-slate-200 px-5 py-3 flex items-center justify-between gap-4 z-20 shadow-sm">
         {/* Branding */}
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-purple-600 p-[1.5px] shadow-lg shadow-cyan-500/20 flex items-center justify-center">
-            <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center text-cyan-400 font-mono font-bold text-sm">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 p-[1.5px] shadow-md shadow-sky-500/20 flex items-center justify-center">
+            <div className="w-full h-full bg-white rounded-[10px] flex items-center justify-center text-sky-600 font-mono font-bold text-base">
               Ψ
             </div>
           </div>
           <div>
-            <h1 className="text-white font-bold text-base tracking-wide flex items-center gap-2 font-['Outfit']">
+            <h1 className="text-slate-900 font-bold text-base tracking-wide flex items-center gap-2 font-['Outfit']">
               Narrative Entangler
-              <span className="text-[10px] font-mono font-normal px-2 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-500/30 text-cyan-400">
+              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-sky-50 border border-sky-200 text-sky-700">
                 Studio 2.0
               </span>
             </h1>
-            <p className="text-[11px] text-slate-400 font-mono">
+            <p className="text-[11px] text-slate-500 font-medium">
               Consistent Quantum Multiverse Story Engine
             </p>
           </div>
         </div>
 
         {/* Live Metrics */}
-        <div className="hidden lg:flex items-center gap-4 text-xs font-mono bg-slate-950/80 border border-slate-800/80 px-3.5 py-1.5 rounded-xl text-slate-400">
+        <div className="hidden lg:flex items-center gap-4 text-xs font-mono bg-slate-50 border border-slate-200 px-3.5 py-1.5 rounded-xl text-slate-600 shadow-inner">
           <div>
-            <span className="text-slate-500">Beats: </span>
-            <span className="text-cyan-300 font-semibold">{qubits.length}/{MAX_WORLDLINES}</span>
+            <span className="text-slate-400 font-normal">Beats: </span>
+            <span className="text-sky-700 font-semibold">{qubits.length}/{MAX_WORLDLINES}</span>
           </div>
-          <div className="w-[1px] h-3.5 bg-slate-800" />
+          <div className="w-[1px] h-3.5 bg-slate-200" />
           <div>
-            <span className="text-slate-500">State Space: </span>
-            <span className="text-purple-300 font-semibold">{totalStateSpace} Timelines</span>
+            <span className="text-slate-400 font-normal">State Space: </span>
+            <span className="text-purple-700 font-semibold">{totalStateSpace} Timelines</span>
           </div>
-          <div className="w-[1px] h-3.5 bg-slate-800" />
+          <div className="w-[1px] h-3.5 bg-slate-200" />
           <div>
-            <span className="text-slate-500">Gates: </span>
-            <span className="text-white font-semibold">{totalGates}</span>
+            <span className="text-slate-400 font-normal">Gates: </span>
+            <span className="text-slate-800 font-semibold">{totalGates}</span>
           </div>
-          <div className="w-[1px] h-3.5 bg-slate-800" />
+          <div className="w-[1px] h-3.5 bg-slate-200" />
           <div>
-            <span className="text-slate-500">Entangled: </span>
-            <span className="text-amber-300 font-semibold">{connections.length}</span>
+            <span className="text-slate-400 font-normal">Entangled: </span>
+            <span className="text-amber-700 font-semibold">{connections.length}</span>
           </div>
         </div>
 
@@ -311,7 +317,7 @@ export default function App() {
           <select
             onChange={(e) => loadPreset(e.target.value)}
             defaultValue="triad"
-            className="bg-slate-950 border border-slate-700 hover:border-slate-600 text-slate-200 text-xs font-mono py-1.5 px-3 rounded-xl focus:outline-none focus:border-cyan-500 transition-colors cursor-pointer"
+            className="bg-white border border-slate-200 hover:border-slate-300 text-slate-700 text-xs font-medium py-1.5 px-3 rounded-xl focus:outline-none focus:border-sky-500 transition-colors cursor-pointer shadow-sm"
           >
             <option value="even_bell">Preset: Even Parity (Co-occur)</option>
             <option value="odd_bell">Preset: Odd Parity (Conflict)</option>
@@ -322,7 +328,7 @@ export default function App() {
           {/* Story Beats Modal Button */}
           <button
             onClick={() => setShowStoryBeats(true)}
-            className="px-3.5 py-1.5 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-200 hover:text-white rounded-xl font-mono text-xs font-medium transition-all flex items-center gap-1.5"
+            className="px-3.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 hover:text-slate-900 rounded-xl font-sans text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm"
             title="Edit story beats, characters, and narrative branches"
           >
             <span>📖</span>
@@ -332,7 +338,7 @@ export default function App() {
           {/* State Distribution Modal Button */}
           <button
             onClick={() => setShowStateDistribution(true)}
-            className="px-3.5 py-1.5 bg-cyan-950/50 hover:bg-cyan-900/60 border border-cyan-500/40 text-cyan-300 hover:text-cyan-200 rounded-xl font-mono text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm shadow-cyan-950"
+            className="px-3.5 py-1.5 bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-800 hover:text-sky-900 rounded-xl font-sans text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm"
             title="View full quantum state probability distribution"
           >
             <span>📊</span>
@@ -342,7 +348,7 @@ export default function App() {
           {/* Story Generator Modal Button */}
           <button
             onClick={() => setShowStoryGenerator(true)}
-            className="px-4 py-1.5 bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white font-mono text-xs font-bold rounded-xl transition-all shadow-md shadow-purple-900/40 flex items-center gap-1.5"
+            className="px-4 py-1.5 bg-gradient-to-r from-sky-600 via-indigo-600 to-purple-600 hover:from-sky-700 hover:to-purple-700 text-white font-sans text-xs font-bold rounded-xl transition-all shadow-md shadow-indigo-100 flex items-center gap-1.5"
             title="Sample and generate complete narrative from quantum distribution"
           >
             <span>✨</span>
@@ -352,7 +358,7 @@ export default function App() {
           {/* Reset Circuit */}
           <button
             onClick={resetCircuit}
-            className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-950/30 rounded-xl transition-colors text-xs font-mono"
+            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 rounded-xl transition-colors text-xs font-mono"
             title="Clear all gates and connections"
           >
             ↺
@@ -361,7 +367,7 @@ export default function App() {
       </header>
 
       {/* ── Main Canvas Viewport ──────────────────────────────────────── */}
-      <main className="flex-1 relative overflow-hidden bg-[#0a0f1d]">
+      <main className="flex-1 relative overflow-hidden bg-slate-50">
         <PixiWorldlineCanvas
           qubits={qubits}
           connections={connections}
@@ -370,6 +376,7 @@ export default function App() {
           onToggleConnectionParity={handleToggleConnectionParity}
           onEditQubit={(qubit) => setSelectedQubit(qubit)}
           onPlaceGate={handlePlaceGate}
+          onRemoveGate={handleRemoveGateDirect}
           onEditGate={handleEditGate}
           onRemoveConnection={handleRemoveConnection}
           onRemoveWorldline={removeWorldlineById}
@@ -378,20 +385,29 @@ export default function App() {
 
         {/* Floating Quick Action Badge */}
         <div className="absolute top-4 left-6 pointer-events-none flex items-center gap-2">
-          <span className="text-[11px] font-mono text-slate-400 bg-slate-950/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-slate-800/80 shadow-lg">
-            ✨ <strong className="text-cyan-400 font-medium">Click line</strong> to place 50/50 H-Gate · <strong className="text-purple-400 font-medium">Drag line-to-line</strong> to Entangle · <strong className="text-amber-400 font-medium">Click Parity Badge</strong> to Toggle Even/Odd
+          <span className="text-[11px] font-sans font-medium text-slate-600 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-slate-200/90 shadow-md flex items-center gap-2">
+            <span>💡</span>
+            <span><strong className="text-sky-700 font-semibold">Click Beat Card</strong> to edit narrative</span>
+            <span className="text-slate-300">·</span>
+            <span><strong className="text-sky-700 font-semibold">Click line</strong> to place H-Gate</span>
+            <span className="text-slate-300">·</span>
+            <span><strong className="text-rose-600 font-semibold">Click H-Gate</strong> to remove</span>
+            <span className="text-slate-300">·</span>
+            <span><strong className="text-purple-700 font-semibold">Drag line-to-line</strong> to Entangle</span>
+            <span className="text-slate-300">·</span>
+            <span><strong className="text-amber-700 font-semibold">Click Parity Badge</strong> to toggle Even/Odd</span>
           </span>
         </div>
       </main>
 
       {/* ── Footer Status Bar ────────────────────────────────────────── */}
-      <footer className="bg-slate-900/90 border-t border-slate-800/80 px-5 py-2 flex items-center justify-between text-[11px] font-mono text-slate-400">
+      <footer className="bg-white/95 border-t border-slate-200 px-5 py-2 flex items-center justify-between text-[11px] font-sans text-slate-600 shadow-sm">
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             Quantum Engine Online
           </span>
-          <span className="text-slate-600">|</span>
+          <span className="text-slate-300">|</span>
           <span>10-Qubit Unitary Simulation Active</span>
         </div>
         <div className="flex items-center gap-4 text-slate-500">

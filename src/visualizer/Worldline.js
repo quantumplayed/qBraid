@@ -1,17 +1,18 @@
 import * as PIXI from 'pixi.js';
 
 /**
- * A single quantum worldline rendered in Pixi.js.
+ * Worldline (Modern Bright Studio Edition)
+ * A quantum worldline rendered in Pixi.js on a crisp light theme.
  *
  * Visual states:
- *  - Certain (isUncertain=false or no gates): solid cyan line
- *  - Uncertain (isUncertain=true + has gates): solid up to first gate, shimmers after
+ *  - Certain: solid deep sky-blue line (0x0284c7)
+ *  - Uncertain: solid up to first gate, iridescent energetic shimmer after
  *
  * Interactions:
- *  - Click start dot → emits 'edit-narrative'
- *  - Single click on line body → emits 'place-gate' with position
- *  - Click gate diamond → emits 'edit-gate'
- *  - Click+drag from line body → emits 'drag-start' for thread connection
+ *  - Interactive Story Beat Node Card at the beginning with "✎ Edit" affordance
+ *  - Click on line body -> places H gate
+ *  - Click on placed gate diamond -> instantly removes gate
+ *  - Drag from line body -> creates entanglement thread
  */
 export default class Worldline extends PIXI.Container {
     constructor({ id, name, y, x, lineWidth, gates = [], isUncertain = false }) {
@@ -25,6 +26,9 @@ export default class Worldline extends PIXI.Container {
         this.gates = gates;
         this.isUncertain = isUncertain;
 
+        // Node pill width offset: line starts after the start node pill
+        this.START_NODE_WIDTH = 130;
+
         // Internal state
         this._hoverActive = false;
         this._hoverX = 0;
@@ -35,22 +39,36 @@ export default class Worldline extends PIXI.Container {
         this._pointerDownX = 0;
         this._pointerDownY = 0;
         this._isDragging = false;
-        this._DRAG_THRESHOLD = 8;   // px movement to switch from click to drag
-        this._CLICK_MAX_MS = 300;   // max ms for a click
+        this._DRAG_THRESHOLD = 8;
+        this._CLICK_MAX_MS = 300;
 
         // Build display objects
+        this._buildTrackGuideline();
         this._buildStaticLine();
         this._buildShimmerLine();
         this._buildGateDiamonds();
         this._buildHoverDot();
-        this._buildLabel();
-        this._buildStartDot();
+        this._buildStartNodeCard();
         this._buildHitArea();
     }
 
     // ═══════════════════════════════════════════════════════════════════════
     //  CONSTRUCTION
     // ═══════════════════════════════════════════════════════════════════════
+
+    _buildTrackGuideline() {
+        // Subtle background rail
+        this.trackGuideline = new PIXI.Graphics();
+        const startX = this.lineX + this.START_NODE_WIDTH + 8;
+        const endX = this.lineX + this.lineWidth;
+
+        this.trackGuideline.setStrokeStyle({ width: 1.5, color: 0xe2e8f0, alpha: 0.8 });
+        this.trackGuideline.moveTo(startX, this.lineY);
+        this.trackGuideline.lineTo(endX, this.lineY);
+        this.trackGuideline.stroke();
+
+        this.addChild(this.trackGuideline);
+    }
 
     _buildStaticLine() {
         this.staticLine = new PIXI.Graphics();
@@ -62,19 +80,22 @@ export default class Worldline extends PIXI.Container {
         const g = this.staticLine;
         g.clear();
 
+        const startX = this.lineX + this.START_NODE_WIDTH + 8;
+        const totalUsableWidth = this.lineWidth - this.START_NODE_WIDTH - 8;
+
         const endX = this._shouldShimmer()
-            ? this.lineX + this._getShimmerStartFraction() * this.lineWidth
+            ? startX + this._getShimmerStartFraction() * totalUsableWidth
             : this.lineX + this.lineWidth;
 
-        // Glow behind
-        g.setStrokeStyle({ width: 6, color: 0x00d9ff, alpha: 0.12 });
-        g.moveTo(this.lineX, this.lineY);
+        // Soft sky glow
+        g.setStrokeStyle({ width: 5, color: 0x38bdf8, alpha: 0.22 });
+        g.moveTo(startX, this.lineY);
         g.lineTo(endX, this.lineY);
         g.stroke();
 
-        // Core line
-        g.setStrokeStyle({ width: 2, color: 0x00d9ff, alpha: 1 });
-        g.moveTo(this.lineX, this.lineY);
+        // Core line in rich sky blue
+        g.setStrokeStyle({ width: 2.5, color: 0x0284c7, alpha: 1 });
+        g.moveTo(startX, this.lineY);
         g.lineTo(endX, this.lineY);
         g.stroke();
     }
@@ -93,73 +114,117 @@ export default class Worldline extends PIXI.Container {
     _drawGateDiamonds() {
         this.gateContainer.removeChildren();
 
+        const startX = this.lineX + this.START_NODE_WIDTH + 8;
+        const totalUsableWidth = this.lineWidth - this.START_NODE_WIDTH - 8;
+
         for (const gate of this.gates) {
-            const cx = this.lineX + gate.position * this.lineWidth;
+            const cx = startX + gate.position * totalUsableWidth;
             const cy = this.lineY;
-            const s = 7;
+            const s = 8;
 
-            const diamond = new PIXI.Graphics();
+            const diamondContainer = new PIXI.Container();
 
-            // Outer glow
-            diamond.setStrokeStyle({ width: 2, color: 0x22d3ee, alpha: 0.4 });
-            diamond.moveTo(cx, cy - s - 3);
-            diamond.lineTo(cx + s + 3, cy);
-            diamond.lineTo(cx, cy + s + 3);
-            diamond.lineTo(cx - s - 3, cy);
-            diamond.closePath();
-            diamond.stroke();
+            // Diamond graphics
+            const diamondG = new PIXI.Graphics();
 
-            // Inner diamond
-            diamond.fill({ color: 0x22d3ee, alpha: 0.9 });
-            diamond.moveTo(cx, cy - s);
-            diamond.lineTo(cx + s, cy);
-            diamond.lineTo(cx, cy + s);
-            diamond.lineTo(cx - s, cy);
-            diamond.closePath();
-            diamond.fill();
+            // Default look
+            const drawNormal = () => {
+                diamondG.clear();
+                // Outer glow
+                diamondG.setStrokeStyle({ width: 2, color: 0x0284c7, alpha: 0.4 });
+                diamondG.moveTo(cx, cy - s - 3);
+                diamondG.lineTo(cx + s + 3, cy);
+                diamondG.lineTo(cx, cy + s + 3);
+                diamondG.lineTo(cx - s - 3, cy);
+                diamondG.closePath();
+                diamondG.stroke();
 
-            // Compute probability of active outcome: sin^2(theta / 2)
+                // Inner diamond
+                diamondG.fill({ color: 0x0284c7, alpha: 1 });
+                diamondG.moveTo(cx, cy - s);
+                diamondG.lineTo(cx + s, cy);
+                diamondG.lineTo(cx, cy + s);
+                diamondG.lineTo(cx - s, cy);
+                diamondG.closePath();
+                diamondG.fill();
+            };
+
+            const drawHoverRemove = () => {
+                diamondG.clear();
+                // Red glowing outline
+                diamondG.setStrokeStyle({ width: 2.5, color: 0xef4444, alpha: 0.8 });
+                diamondG.moveTo(cx, cy - s - 3);
+                diamondG.lineTo(cx + s + 3, cy);
+                diamondG.lineTo(cx, cy + s + 3);
+                diamondG.lineTo(cx - s - 3, cy);
+                diamondG.closePath();
+                diamondG.stroke();
+
+                // Red filled inner diamond
+                diamondG.fill({ color: 0xef4444, alpha: 1 });
+                diamondG.moveTo(cx, cy - s);
+                diamondG.lineTo(cx + s, cy);
+                diamondG.lineTo(cx, cy + s);
+                diamondG.lineTo(cx - s, cy);
+                diamondG.closePath();
+                diamondG.fill();
+            };
+
+            drawNormal();
+            diamondContainer.addChild(diamondG);
+
+            // Gate Label
             const theta = gate.theta ?? (Math.PI / 2);
             const prob = Math.sin(theta / 2) ** 2;
             const isH = Math.abs(prob - 0.5) < 0.02;
             const gateText = isH ? 'H' : `H(${Math.round(prob * 100)}%)`;
 
-            // Label
             const label = new PIXI.Text({
                 text: gateText,
                 style: {
-                    fontFamily: '"Inter", monospace',
+                    fontFamily: '"Inter", monospace, sans-serif',
                     fontSize: 9,
-                    fill: 0x22d3ee,
+                    fill: 0x0369a1,
                     fontWeight: 'bold',
                 },
             });
             label.anchor.set(0.5, 1);
             label.x = cx;
-            label.y = cy - s - 6;
-            diamond.addChild(label);
+            label.y = cy - s - 5;
+            diamondContainer.addChild(label);
 
-            // Hit area for clicking the diamond
+            // Hit area for clicking the diamond -> removes gate!
             const hitArea = new PIXI.Graphics();
             hitArea.fill({ color: 0x000000, alpha: 0.001 });
-            hitArea.rect(cx - 15, cy - 15, 30, 30);
+            hitArea.rect(cx - 16, cy - 16, 32, 32);
             hitArea.fill();
             hitArea.interactive = true;
             hitArea.cursor = 'pointer';
 
+            // Hover state: highlights in red with "✕ Remove"
+            hitArea.on('pointerover', () => {
+                drawHoverRemove();
+                label.text = '✕ Remove';
+                label.style.fill = 0xef4444;
+            });
+
+            hitArea.on('pointerout', () => {
+                drawNormal();
+                label.text = gateText;
+                label.style.fill = 0x0369a1;
+            });
+
+            // Click -> Remove Gate immediately
             hitArea.on('pointerdown', (e) => {
                 e.stopPropagation();
-                this.emit('edit-gate', {
+                this.emit('remove-gate', {
                     qubitId: this.qubitId,
                     gateId: gate.id,
-                    gate,
-                    screenX: e.global.x,
-                    screenY: e.global.y,
                 });
             });
 
-            diamond.addChild(hitArea);
-            this.gateContainer.addChild(diamond);
+            diamondContainer.addChild(hitArea);
+            this.gateContainer.addChild(diamondContainer);
         }
     }
 
@@ -173,138 +238,179 @@ export default class Worldline extends PIXI.Container {
         const g = this.hoverDot;
         g.clear();
 
-        const baseRadius = 10;
-        const glowRadius = baseRadius + 8 * pulse;
+        const baseRadius = 8;
+        const glowRadius = baseRadius + 6 * pulse;
 
         // Outer glow
-        g.fill({ color: 0x22d3ee, alpha: 0.08 * pulse });
-        g.circle(x, this.lineY, glowRadius + 6);
+        g.fill({ color: 0x0284c7, alpha: 0.12 * pulse });
+        g.circle(x, this.lineY, glowRadius + 4);
         g.fill();
 
         // Mid glow
-        g.fill({ color: 0x22d3ee, alpha: 0.15 * pulse });
+        g.fill({ color: 0x38bdf8, alpha: 0.25 * pulse });
         g.circle(x, this.lineY, glowRadius);
         g.fill();
 
         // Core dot
-        g.fill({ color: 0x22d3ee, alpha: 0.85 });
-        g.circle(x, this.lineY, 5);
-        g.fill();
-
-        // Bright center
-        g.fill({ color: 0xffffff, alpha: 0.6 });
-        g.circle(x, this.lineY, 2);
+        g.fill({ color: 0x0284c7, alpha: 1 });
+        g.circle(x, this.lineY, 4.5);
         g.fill();
     }
 
-    _buildLabel() {
-        this.label = new PIXI.Text({
+    /**
+     * Obvious, clickable Story Beat Node Card at the beginning of the line.
+     * Features prominent "✎ Edit" icon and hover affordance.
+     */
+    _buildStartNodeCard() {
+        this.startCard = new PIXI.Container();
+        const cardX = this.lineX;
+        const cardY = this.lineY - 14;
+        const cardW = this.START_NODE_WIDTH;
+        const cardH = 28;
+
+        // Card background pill
+        const cardBg = new PIXI.Graphics();
+        const drawCardBg = (isHover) => {
+            cardBg.clear();
+            // Background fill
+            cardBg.fill({ color: isHover ? 0xf0f9ff : 0xffffff, alpha: 0.98 });
+            cardBg.setStrokeStyle({
+                width: isHover ? 2 : 1.5,
+                color: isHover ? 0x0284c7 : 0xbae6fd,
+                alpha: 1,
+            });
+            cardBg.roundRect(cardX, cardY, cardW, cardH, 8);
+            cardBg.fill();
+            cardBg.stroke();
+        };
+        drawCardBg(false);
+        this.startCard.addChild(cardBg);
+
+        // State indicator dot (small pulsing cyan circle on the left)
+        const nodeDot = new PIXI.Graphics();
+        nodeDot.fill({ color: 0x0284c7, alpha: 1 });
+        nodeDot.circle(cardX + 12, this.lineY, 4);
+        nodeDot.fill();
+        this.startCard.addChild(nodeDot);
+
+        // Character / Beat Name Text
+        this.cardLabel = new PIXI.Text({
             text: this.qubitName,
             style: {
-                fontFamily: '"Inter", "SF Pro", system-ui, monospace',
-                fontSize: 12,
-                fill: 0x94a3b8,
-                letterSpacing: 0.5,
+                fontFamily: '"Inter", system-ui, sans-serif',
+                fontSize: 11,
+                fontWeight: '600',
+                fill: 0x0f172a, // dark slate
             },
         });
-        this.label.x = this.lineX + 22;
-        this.label.y = this.lineY - 22;
-        this.addChild(this.label);
-    }
+        this.cardLabel.x = cardX + 22;
+        this.cardLabel.y = cardY + 7;
+        this.startCard.addChild(this.cardLabel);
 
-    _buildStartDot() {
-        this.startDot = new PIXI.Graphics();
-        this._drawStartDot(1.0);
-        this.addChild(this.startDot);
+        // "✎ Edit" hint badge on the right
+        const editHint = new PIXI.Text({
+            text: '✎ Edit',
+            style: {
+                fontFamily: '"Inter", system-ui, sans-serif',
+                fontSize: 9,
+                fontWeight: '600',
+                fill: 0x0284c7,
+            },
+        });
+        editHint.x = cardX + cardW - 36;
+        editHint.y = cardY + 8;
+        this.startCard.addChild(editHint);
 
-        // Interactive hit zone for the start dot
-        const hitDot = new PIXI.Graphics();
-        hitDot.fill({ color: 0x000000, alpha: 0.001 });
-        hitDot.circle(this.lineX, this.lineY, 18);
-        hitDot.fill();
-        hitDot.interactive = true;
-        hitDot.cursor = 'pointer';
+        // Clickable hit zone for the card
+        const cardHit = new PIXI.Graphics();
+        cardHit.fill({ color: 0x000000, alpha: 0.001 });
+        cardHit.roundRect(cardX, cardY, cardW, cardH, 8);
+        cardHit.fill();
+        cardHit.interactive = true;
+        cardHit.cursor = 'pointer';
 
-        hitDot.on('pointerdown', (e) => {
+        cardHit.on('pointerover', () => {
+            drawCardBg(true);
+            editHint.style.fill = 0x0369a1;
+        });
+
+        cardHit.on('pointerout', () => {
+            drawCardBg(false);
+            editHint.style.fill = 0x0284c7;
+        });
+
+        cardHit.on('pointerdown', (e) => {
             e.stopPropagation();
             this.emit('edit-narrative', { qubitId: this.qubitId });
         });
 
-        this.addChild(hitDot);
+        this.startCard.addChild(cardHit);
 
-        // Remove button: small ✕ to the left of the start dot
-        this._removeBtn = new PIXI.Container();
+        // Delete button (✕) to the left of the card
+        const delContainer = new PIXI.Container();
+        delContainer.x = cardX - 16;
+        delContainer.y = this.lineY;
 
-        const removeText = new PIXI.Text({
+        const delBg = new PIXI.Graphics();
+        delBg.fill({ color: 0xffffff, alpha: 0.95 });
+        delBg.setStrokeStyle({ width: 1, color: 0xcbd5e1, alpha: 1 });
+        delBg.circle(0, 0, 7.5);
+        delBg.fill();
+        delBg.stroke();
+
+        const delText = new PIXI.Text({
             text: '✕',
             style: {
-                fontFamily: '"Inter", system-ui',
-                fontSize: 12,
-                fill: 0x94a3b8,
+                fontFamily: 'system-ui, sans-serif',
+                fontSize: 8,
+                fill: 0x64748b,
             },
         });
-        removeText.anchor.set(0.5, 0.5);
-        removeText.x = this.lineX - 20;
-        removeText.y = this.lineY;
-        this._removeBtn.addChild(removeText);
+        delText.anchor.set(0.5, 0.5);
 
-        const removeHit = new PIXI.Graphics();
-        removeHit.fill({ color: 0x000000, alpha: 0.001 });
-        removeHit.circle(this.lineX - 20, this.lineY, 12);
-        removeHit.fill();
-        removeHit.interactive = true;
-        removeHit.cursor = 'pointer';
+        delContainer.addChild(delBg);
+        delContainer.addChild(delText);
+        delContainer.interactive = true;
+        delContainer.cursor = 'pointer';
 
-        removeHit.on('pointerover', () => { removeText.style.fill = 0xef4444; });
-        removeHit.on('pointerout', () => { removeText.style.fill = 0x94a3b8; });
-        removeHit.on('pointerdown', (e) => {
+        delContainer.on('pointerover', () => {
+            delBg.clear();
+            delBg.fill({ color: 0xef4444, alpha: 1 });
+            delBg.circle(0, 0, 7.5);
+            delBg.fill();
+            delText.style.fill = 0xffffff;
+        });
+        delContainer.on('pointerout', () => {
+            delBg.clear();
+            delBg.fill({ color: 0xffffff, alpha: 0.95 });
+            delBg.setStrokeStyle({ width: 1, color: 0xcbd5e1, alpha: 1 });
+            delBg.circle(0, 0, 7.5);
+            delBg.fill();
+            delBg.stroke();
+            delText.style.fill = 0x64748b;
+        });
+        delContainer.on('pointerdown', (e) => {
             e.stopPropagation();
             this.emit('remove-worldline', { qubitId: this.qubitId });
         });
 
-        this._removeBtn.addChild(removeHit);
-        this.addChild(this._removeBtn);
-    }
-
-    _drawStartDot(pulse) {
-        const g = this.startDot;
-        g.clear();
-
-        const glowRadius = 12 * pulse;
-
-        // Outer glow
-        g.fill({ color: 0x22d3ee, alpha: 0.15 * (1 - pulse * 0.3) });
-        g.circle(this.lineX, this.lineY, glowRadius + 5);
-        g.fill();
-
-        // Mid glow
-        g.fill({ color: 0x22d3ee, alpha: 0.25 * (1 - pulse * 0.2) });
-        g.circle(this.lineX, this.lineY, glowRadius);
-        g.fill();
-
-        // Core dot
-        g.fill({ color: 0x22d3ee, alpha: 1 });
-        g.circle(this.lineX, this.lineY, 8);
-        g.fill();
-
-        // Inner bright
-        g.fill({ color: 0xffffff, alpha: 0.4 });
-        g.circle(this.lineX, this.lineY, 3);
-        g.fill();
+        this.addChild(delContainer);
+        this.addChild(this.startCard);
     }
 
     _buildHitArea() {
-        // Invisible wider zone for pointer events on the line body
+        const startX = this.lineX + this.START_NODE_WIDTH + 8;
+        const totalUsableWidth = this.lineWidth - this.START_NODE_WIDTH - 8;
+
         this.hitZone = new PIXI.Graphics();
         this.hitZone.fill({ color: 0x000000, alpha: 0.001 });
-        // Start offset past the start dot
-        this.hitZone.rect(this.lineX + 20, this.lineY - 25, this.lineWidth - 20, 50);
+        this.hitZone.rect(startX, this.lineY - 20, totalUsableWidth, 40);
         this.hitZone.fill();
 
         this.hitZone.interactive = true;
         this.hitZone.cursor = 'default';
 
-        // Click vs drag: track pointer down, distinguish by movement & time
+        // Click vs drag: click places gate, drag starts connection thread
         this.hitZone.on('pointerdown', (e) => {
             this._pointerDownTime = Date.now();
             this._pointerDownX = e.global.x;
@@ -333,17 +439,16 @@ export default class Worldline extends PIXI.Container {
             this._pointerDownTime = 0;
 
             if (!this._isDragging && elapsed < this._CLICK_MAX_MS) {
-                // This is a click — check if clicking on an existing gate
                 const clickX = e.global.x;
                 const isOnGate = this.gates.some(gate => {
-                    const gateX = this.lineX + gate.position * this.lineWidth;
-                    return Math.abs(clickX - gateX) < 15;
+                    const gateX = startX + gate.position * totalUsableWidth;
+                    return Math.abs(clickX - gateX) < 18;
                 });
 
                 if (!isOnGate) {
-                    // Place a new gate
+                    // Place a new H gate
                     const position = Math.max(0.05, Math.min(0.95,
-                        (clickX - this.lineX) / this.lineWidth
+                        (clickX - startX) / totalUsableWidth
                     ));
                     this.emit('place-gate', {
                         qubitId: this.qubitId,
@@ -363,7 +468,7 @@ export default class Worldline extends PIXI.Container {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    //  QUERIES
+    //  QUERIES & UPDATES
     // ═══════════════════════════════════════════════════════════════════════
 
     _shouldShimmer() {
@@ -371,7 +476,7 @@ export default class Worldline extends PIXI.Container {
     }
 
     _getShimmerStartFraction() {
-        if (this.gates.length === 0) return 0.5; // Entanglement-only: shimmer from midpoint
+        if (this.gates.length === 0) return 0.5;
         return Math.min(...this.gates.map(g => g.position));
     }
 
@@ -379,21 +484,18 @@ export default class Worldline extends PIXI.Container {
         return Math.abs(globalY - this.lineY) < 25;
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    //  UPDATES
-    // ═══════════════════════════════════════════════════════════════════════
-
     setHover(cursorX, isNear) {
         this._hoverActive = isNear;
+        const startX = this.lineX + this.START_NODE_WIDTH + 8;
         if (isNear) {
-            this._hoverX = Math.max(this.lineX, Math.min(this.lineX + this.lineWidth, cursorX));
+            this._hoverX = Math.max(startX, Math.min(this.lineX + this.lineWidth, cursorX));
         }
     }
 
     updateData({ name, gates, isUncertain }) {
         if (name !== undefined && name !== this.qubitName) {
             this.qubitName = name;
-            this.label.text = name;
+            if (this.cardLabel) this.cardLabel.text = name;
         }
         let needsRedraw = false;
         if (gates !== undefined) {
@@ -414,12 +516,7 @@ export default class Worldline extends PIXI.Container {
         this._time += dt * 0.05;
         this._updateShimmer();
         this._updateHoverDot();
-        this._updateStartDot();
     }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    //  FRAME-LEVEL RENDERING
-    // ═══════════════════════════════════════════════════════════════════════
 
     _updateShimmer() {
         const g = this.shimmerLine;
@@ -427,39 +524,26 @@ export default class Worldline extends PIXI.Container {
 
         if (!this._shouldShimmer()) return;
 
+        const startX = this.lineX + this.START_NODE_WIDTH + 8;
+        const totalUsableWidth = this.lineWidth - this.START_NODE_WIDTH - 8;
         const startFrac = this._getShimmerStartFraction();
-        const startX = this.lineX + startFrac * this.lineWidth;
-        const endX = this.lineX + this.lineWidth;
-        const segmentCount = Math.max(8, Math.round((endX - startX) / 8));
-        const segLen = (endX - startX) / segmentCount;
+        const sx = startX + startFrac * totalUsableWidth;
+        const ex = this.lineX + this.lineWidth;
+        const segmentCount = Math.max(8, Math.round((ex - sx) / 8));
+        const segLen = (ex - sx) / segmentCount;
 
-        // Draw glow layer
+        // Dynamic light-mode wave
         for (let i = 0; i < segmentCount; i++) {
-            const sx = startX + i * segLen;
-            const ex = sx + segLen;
+            const segSx = sx + i * segLen;
+            const segEx = segSx + segLen;
             const phase = this._time * 3.0 + i * 0.45;
-            const alpha = 0.06 + Math.sin(phase) * 0.04;
+            const alpha = 0.4 + Math.sin(phase) * 0.3;
             const yOff = Math.sin(phase * 0.7) * 1.5;
+            const color = i % 2 === 0 ? 0x0284c7 : 0x6366f1;
 
-            g.setStrokeStyle({ width: 10, color: 0x7dd3fc, alpha });
-            g.moveTo(sx, this.lineY + yOff);
-            g.lineTo(ex, this.lineY + Math.sin(phase + 0.45) * 1.5);
-            g.stroke();
-        }
-
-        // Draw core shimmer
-        for (let i = 0; i < segmentCount; i++) {
-            const sx = startX + i * segLen;
-            const ex = sx + segLen;
-            const phase = this._time * 3.0 + i * 0.45;
-            const alpha = 0.35 + Math.sin(phase) * 0.35 + Math.sin(phase * 1.7) * 0.15;
-            const yOff = Math.sin(phase * 0.7) * 1.8;
-            const yOff2 = Math.sin((phase + 0.45) * 0.7) * 1.8;
-            const color = i % 3 === 0 ? 0x7dd3fc : 0x00d9ff;
-
-            g.setStrokeStyle({ width: 2, color, alpha: Math.max(0.2, Math.min(1, alpha)) });
-            g.moveTo(sx, this.lineY + yOff);
-            g.lineTo(ex, this.lineY + yOff2);
+            g.setStrokeStyle({ width: 2.5, color, alpha: Math.max(0.2, Math.min(0.9, alpha)) });
+            g.moveTo(segSx, this.lineY + yOff);
+            g.lineTo(segEx, this.lineY + Math.sin((phase + 0.45) * 0.7) * 1.5);
             g.stroke();
         }
     }
@@ -472,10 +556,5 @@ export default class Worldline extends PIXI.Container {
         this.hoverDot.visible = true;
         const pulse = 0.7 + Math.sin(this._time * 5) * 0.3;
         this._drawHoverDot(this._hoverX, pulse);
-    }
-
-    _updateStartDot() {
-        const pulse = 1 + Math.sin(this._time * 2.5) * 0.15;
-        this._drawStartDot(pulse);
     }
 }

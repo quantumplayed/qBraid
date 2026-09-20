@@ -58,22 +58,22 @@ export default function StateDistributionModal({
     }, [allStates, filterNonZero, sortBy]);
 
     return (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
-            <div className="bg-slate-900 border border-cyan-500/40 rounded-2xl shadow-2xl shadow-cyan-950/80 max-w-4xl w-full flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-4xl w-full flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200 text-slate-800">
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-slate-800 bg-slate-900/90 flex items-center justify-between">
+                <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
+                        <div className="p-2.5 rounded-xl bg-sky-50 border border-sky-200 text-sky-600">
                             <span className="text-xl">📊</span>
                         </div>
                         <div>
-                            <h2 className="text-lg font-bold text-white tracking-wide flex items-center gap-2">
+                            <h2 className="text-lg font-bold text-slate-900 tracking-wide flex items-center gap-2">
                                 Quantum State Distribution
-                                <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-cyan-950 border border-cyan-500/40 text-cyan-300">
+                                <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-sky-50 border border-sky-200 text-sky-800 font-semibold">
                                     Wavefunction |Ψ⟩
                                 </span>
                             </h2>
-                            <p className="text-xs text-slate-400 font-mono">
+                            <p className="text-xs text-slate-500 font-mono">
                                 Hilbert space distribution across {Math.pow(2, qubits.length)} possible states ({qubits.length} qubits)
                             </p>
                         </div>
@@ -81,26 +81,26 @@ export default function StateDistributionModal({
 
                     <button
                         onClick={onClose}
-                        className="text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-800 p-2 rounded-lg text-sm transition-colors"
+                        className="text-slate-400 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 p-2 rounded-lg text-sm transition-colors"
                     >
                         ✕
                     </button>
                 </div>
 
                 {/* Summary Metrics */}
-                <div className="px-6 py-3 bg-slate-950/60 border-b border-slate-800 flex items-center justify-between flex-wrap gap-4 text-xs font-mono">
+                <div className="px-6 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between flex-wrap gap-4 text-xs font-mono">
                     <div className="flex items-center gap-6">
                         <div>
-                            <span className="text-slate-500">Active Qubits: </span>
-                            <span className="text-white font-bold">{qubits.length}</span>
+                            <span className="text-slate-400">Active Qubits: </span>
+                            <span className="text-slate-900 font-bold">{qubits.length}</span>
                         </div>
                         <div>
-                            <span className="text-slate-500">Total Hilbert Space: </span>
-                            <span className="text-cyan-400 font-bold">{Math.pow(2, qubits.length)} states</span>
+                            <span className="text-slate-400">Total Hilbert Space: </span>
+                            <span className="text-sky-700 font-bold">{Math.pow(2, qubits.length)} states</span>
                         </div>
                         <div>
-                            <span className="text-slate-500">Consistent Outcomes (P &gt; 0): </span>
-                            <span className="text-purple-400 font-bold">{nonZeroCount} branches</span>
+                            <span className="text-slate-400">Consistent Outcomes (P &gt; 0): </span>
+                            <span className="text-purple-700 font-bold">{nonZeroCount} branches</span>
                         </div>
                     </div>
 
@@ -110,8 +110,8 @@ export default function StateDistributionModal({
                             onClick={() => setFilterNonZero(prev => !prev)}
                             className={`px-2.5 py-1 rounded-lg border text-xs transition-colors ${
                                 filterNonZero
-                                    ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 font-semibold'
-                                    : 'bg-slate-800 border-slate-700 text-slate-400'
+                                    ? 'bg-sky-50 border-sky-300 text-sky-800 font-semibold shadow-sm'
+                                    : 'bg-white border-slate-200 text-slate-600'
                             }`}
                         >
                             {filterNonZero ? 'Showing Non-Zero Only' : 'Showing All States'}
@@ -119,7 +119,7 @@ export default function StateDistributionModal({
 
                         <button
                             onClick={() => setSortBy(s => s === 'prob' ? 'index' : 'prob')}
-                            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-lg text-xs transition-colors"
+                            className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs transition-colors shadow-sm font-medium"
                         >
                             Sort: {sortBy === 'prob' ? 'Highest Probability' : 'Binary Index'}
                         </button>
@@ -127,9 +127,9 @@ export default function StateDistributionModal({
                 </div>
 
                 {/* Body - Histogram & State Rows */}
-                <div className="flex-1 p-6 overflow-y-auto space-y-3">
+                <div className="flex-1 p-6 overflow-y-auto space-y-3 bg-slate-50/30">
                     {displayedStates.length === 0 ? (
-                        <div className="h-64 flex items-center justify-center text-slate-500 font-mono text-sm">
+                        <div className="h-64 flex items-center justify-center text-slate-400 font-mono text-sm">
                             No states match the current filter.
                         </div>
                     ) : (
@@ -142,28 +142,28 @@ export default function StateDistributionModal({
                                     key={st.index}
                                     className={`p-3.5 rounded-xl border transition-all ${
                                         isNonZero
-                                            ? 'bg-slate-900/90 border-cyan-500/30 hover:border-cyan-400/60 shadow-md shadow-slate-950/50'
-                                            : 'bg-slate-950/40 border-slate-800/40 opacity-40'
+                                            ? 'bg-white border-slate-200 hover:border-sky-300 shadow-sm'
+                                            : 'bg-white/40 border-slate-200/50 opacity-40'
                                     }`}
                                 >
                                     <div className="flex items-center justify-between gap-4 mb-2">
                                         <div className="flex items-center gap-3">
-                                            <span className="font-mono text-sm font-bold text-cyan-400 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+                                            <span className="font-mono text-sm font-bold text-sky-800 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-200">
                                                 |{st.bitstring}⟩
                                             </span>
-                                            <span className="font-mono text-xs text-slate-400">
+                                            <span className="font-mono text-xs text-slate-500">
                                                 State #{st.index}
                                             </span>
                                         </div>
 
                                         <div className="flex items-center gap-3 font-mono">
-                                            <span className={`text-sm font-bold ${isNonZero ? 'text-purple-300' : 'text-slate-600'}`}>
+                                            <span className={`text-sm font-bold ${isNonZero ? 'text-purple-700' : 'text-slate-400'}`}>
                                                 {st.percent}%
                                             </span>
                                             {isNonZero && onOpenStoryGenerator && (
                                                 <button
                                                     onClick={() => onOpenStoryGenerator(st.index)}
-                                                    className="px-2 py-1 bg-purple-950 hover:bg-purple-900 text-purple-300 hover:text-white border border-purple-500/30 rounded text-[10px] transition-colors"
+                                                    className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 hover:text-purple-900 border border-purple-200 rounded text-xs transition-colors font-medium shadow-sm"
                                                 >
                                                     Read Story ↗
                                                 </button>
@@ -172,14 +172,14 @@ export default function StateDistributionModal({
                                     </div>
 
                                     {/* Probability Bar */}
-                                    <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden mb-2.5 border border-slate-800">
+                                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden mb-2.5 border border-slate-200">
                                         <div
                                             className="h-full rounded-full transition-all duration-300"
                                             style={{
                                                 width: `${barWidth}%`,
                                                 background: isNonZero
-                                                    ? 'linear-gradient(to right, #06b6d4, #a855f7)'
-                                                    : '#334155'
+                                                    ? 'linear-gradient(to right, #0284c7, #7c3aed)'
+                                                    : '#cbd5e1'
                                             }}
                                         />
                                     </div>
@@ -193,8 +193,8 @@ export default function StateDistributionModal({
                                                     key={q.id}
                                                     className={`px-2 py-0.5 rounded border ${
                                                         isPositive
-                                                            ? 'bg-cyan-950/30 border-cyan-500/30 text-cyan-300'
-                                                            : 'bg-purple-950/30 border-purple-500/30 text-purple-300'
+                                                            ? 'bg-sky-50 border-sky-200 text-sky-900 font-medium'
+                                                            : 'bg-purple-50 border-purple-200 text-purple-900 font-medium'
                                                     }`}
                                                 >
                                                     {q.name}: {isPositive ? (q.active || 'Active') : (q.passive || 'Passive')}
@@ -209,13 +209,13 @@ export default function StateDistributionModal({
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-3.5 border-t border-slate-800 flex justify-between items-center bg-slate-900/90">
+                <div className="px-6 py-3.5 border-t border-slate-200 flex justify-between items-center bg-slate-50/70">
                     <span className="text-xs text-slate-500 font-mono">
                         Consistent states are filtered naturally via quantum interference & Bell-pair parity.
                     </span>
                     <button
                         onClick={onClose}
-                        className="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-white font-mono text-xs font-semibold rounded-xl transition-all"
+                        className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-sans text-xs font-semibold rounded-xl transition-all"
                     >
                         Close
                     </button>

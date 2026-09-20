@@ -13,6 +13,7 @@ export default function PixiWorldlineCanvas({
     onEditQubit,
     onPlaceGate,
     onEditGate,
+    onRemoveGate,
     onRemoveConnection,
     onRemoveWorldline,
     onAddWorldline,
@@ -29,6 +30,7 @@ export default function PixiWorldlineCanvas({
         onEditQubit,
         onPlaceGate,
         onEditGate,
+        onRemoveGate,
         onRemoveConnection,
         onRemoveWorldline,
         onAddWorldline
@@ -49,6 +51,7 @@ export default function PixiWorldlineCanvas({
             onEditQubit: (...args) => callbackRefs.current.onEditQubit?.(...args),
             onPlaceGate: (...args) => callbackRefs.current.onPlaceGate?.(...args),
             onEditGate: (...args) => callbackRefs.current.onEditGate?.(...args),
+            onRemoveGate: (...args) => callbackRefs.current.onRemoveGate?.(...args),
             onRemoveConnection: (...args) => callbackRefs.current.onRemoveConnection?.(...args),
             onRemoveWorldline: (...args) => callbackRefs.current.onRemoveWorldline?.(...args),
             onAddWorldline: (...args) => callbackRefs.current.onAddWorldline?.(...args),
@@ -89,7 +92,7 @@ export default function PixiWorldlineCanvas({
                 width: '100%',
                 height: '100%',
                 overflow: 'hidden',
-                background: '#0f172a',
+                background: '#f8fafc',
             }}
         />
     );

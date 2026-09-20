@@ -19,6 +19,7 @@ export default class PixiScene {
     this.onEditQubit = options.onEditQubit || (() => { });
     this.onPlaceGate = options.onPlaceGate || (() => { });
     this.onEditGate = options.onEditGate || (() => { });
+    this.onRemoveGate = options.onRemoveGate || (() => { });
     this.onRemoveConnection = options.onRemoveConnection || (() => { });
     this.onRemoveWorldline = options.onRemoveWorldline || (() => { });
     this.onAddWorldline = options.onAddWorldline || (() => { });
@@ -70,7 +71,7 @@ export default class PixiScene {
       await this.app.init({
         width: this.container.clientWidth,
         height: this.container.clientHeight,
-        backgroundColor: 0x0f172a,
+        backgroundColor: 0xf8fafc, // Modern Bright Studio Canvas
         antialias: true,
         resolution: window.devicePixelRatio,
         autoDensity: true,
@@ -187,6 +188,9 @@ export default class PixiScene {
       wl.on('edit-gate', (data) => {
         this.onEditGate(data);
       });
+      wl.on('remove-gate', (data) => {
+        this.onRemoveGate(data.qubitId, data.gateId);
+      });
       wl.on('remove-worldline', (data) => {
         this.onRemoveWorldline(data.qubitId);
       });
@@ -216,7 +220,7 @@ export default class PixiScene {
 
     // "+" circle
     const circle = new PIXI.Graphics();
-    circle.setStrokeStyle({ width: 1.5, color: 0x475569, alpha: 0.6 });
+    circle.setStrokeStyle({ width: 1.5, color: 0x0284c7, alpha: 0.8 });
     circle.circle(padding, lastY, 10);
     circle.stroke();
 
@@ -224,9 +228,10 @@ export default class PixiScene {
     const plus = new PIXI.Text({
       text: '+',
       style: {
-        fontFamily: '"Inter", system-ui',
-        fontSize: 16,
-        fill: 0x475569,
+        fontFamily: '"Inter", system-ui, sans-serif',
+        fontSize: 15,
+        fontWeight: 'bold',
+        fill: 0x0284c7,
       },
     });
     plus.anchor.set(0.5, 0.5);
@@ -235,11 +240,12 @@ export default class PixiScene {
 
     // Label
     const label = new PIXI.Text({
-      text: 'Add Worldline',
+      text: 'Add Story Beat',
       style: {
-        fontFamily: '"Inter", system-ui',
+        fontFamily: '"Inter", system-ui, sans-serif',
         fontSize: 11,
-        fill: 0x475569,
+        fontWeight: '600',
+        fill: 0x0f172a, // dark slate
         letterSpacing: 0.5,
       },
     });
@@ -259,20 +265,20 @@ export default class PixiScene {
     hitZone.cursor = 'pointer';
 
     hitZone.on('pointerover', () => {
-      plus.style.fill = 0x22d3ee;
+      plus.style.fill = 0x0369a1;
       circle.clear();
-      circle.setStrokeStyle({ width: 1.5, color: 0x22d3ee, alpha: 0.8 });
+      circle.setStrokeStyle({ width: 2, color: 0x0369a1, alpha: 1 });
       circle.circle(padding, lastY, 10);
       circle.stroke();
-      label.style.fill = 0x22d3ee;
+      label.style.fill = 0x0284c7;
     });
     hitZone.on('pointerout', () => {
-      plus.style.fill = 0x475569;
+      plus.style.fill = 0x0284c7;
       circle.clear();
-      circle.setStrokeStyle({ width: 1.5, color: 0x475569, alpha: 0.6 });
+      circle.setStrokeStyle({ width: 1.5, color: 0x0284c7, alpha: 0.8 });
       circle.circle(padding, lastY, 10);
       circle.stroke();
-      label.style.fill = 0x475569;
+      label.style.fill = 0x0f172a;
     });
     hitZone.on('pointerdown', (e) => {
       e.stopPropagation();
@@ -287,7 +293,6 @@ export default class PixiScene {
   //  CONNECTIONS (inter-worldline CNOT gates)
   // ═══════════════════════════════════════════════════════════════════════
 
-
   _drawConnections() {
     this._connectionLayer.removeChildren();
 
@@ -300,36 +305,38 @@ export default class PixiScene {
       if (!controlWl || !targetWl) continue;
 
       const pos = conn.position ?? 0.5;
-      const x = controlWl.lineX + controlWl.lineWidth * pos;
+      const usableStart = controlWl.lineX + 138;
+      const usableWidth = controlWl.lineWidth - 138;
+      const x = usableStart + usableWidth * pos;
       const y1 = controlWl.lineY;
       const y2 = targetWl.lineY;
       const isOdd = conn.parity === 'odd';
 
       const connContainer = new PIXI.Container();
 
-      // Theme colors based on parity
-      const strokeColor = isOdd ? 0xf59e0b : 0xa855f7; // Amber (odd) vs Purple/Cyan (even)
-      const glowColor = isOdd ? 0xfbbf24 : 0x06b6d4;
-      const badgeBg = isOdd ? 0x451a03 : 0x1e1b4b;
-      const badgeBorder = isOdd ? 0xf59e0b : 0x22d3ee;
-      const textColor = isOdd ? 0xfde68a : 0xa5f3fc;
+      // Theme colors based on parity (Modern Bright)
+      const strokeColor = isOdd ? 0xd97706 : 0x7c3aed; // Amber vs Royal Purple
+      const glowColor = isOdd ? 0xfde68a : 0xddd6fe;
+      const badgeBg = 0xffffff;
+      const badgeBorder = isOdd ? 0xd97706 : 0x7c3aed;
+      const textColor = isOdd ? 0xb45309 : 0x6d28d9;
 
       const g = new PIXI.Graphics();
 
       // Vertical line glow
-      g.setStrokeStyle({ width: 5, color: glowColor, alpha: 0.2 });
+      g.setStrokeStyle({ width: 5, color: glowColor, alpha: 0.5 });
       g.moveTo(x, y1);
       g.lineTo(x, y2);
       g.stroke();
 
       // Vertical line core
-      g.setStrokeStyle({ width: 2, color: strokeColor, alpha: 0.85 });
+      g.setStrokeStyle({ width: 2, color: strokeColor, alpha: 0.95 });
       g.moveTo(x, y1);
       g.lineTo(x, y2);
       g.stroke();
 
-      // Control dot (filled circle with glowing halo)
-      g.fill({ color: glowColor, alpha: 0.3 });
+      // Control dot (filled circle with halo)
+      g.fill({ color: glowColor, alpha: 0.6 });
       g.circle(x, y1, 8);
       g.fill();
 
@@ -351,7 +358,7 @@ export default class PixiScene {
 
       // Extra notch for odd parity target (inversion indicator)
       if (isOdd) {
-        g.fill({ color: 0xf59e0b, alpha: 0.8 });
+        g.fill({ color: 0xd97706, alpha: 0.9 });
         g.circle(x, y2, 3);
         g.fill();
       }
@@ -366,13 +373,13 @@ export default class PixiScene {
       badgeContainer.x = x;
       badgeContainer.y = midY;
 
-      const badgeWidth = 84;
-      const badgeHeight = 22;
+      const badgeWidth = 90;
+      const badgeHeight = 24;
 
       const badgeGraphics = new PIXI.Graphics();
-      badgeGraphics.fill({ color: badgeBg, alpha: 0.95 });
-      badgeGraphics.setStrokeStyle({ width: 1.5, color: badgeBorder, alpha: 0.85 });
-      badgeGraphics.roundRect(-badgeWidth / 2, -badgeHeight / 2, badgeWidth, badgeHeight, 11);
+      badgeGraphics.fill({ color: badgeBg, alpha: 0.98 });
+      badgeGraphics.setStrokeStyle({ width: 1.5, color: badgeBorder, alpha: 1 });
+      badgeGraphics.roundRect(-badgeWidth / 2, -badgeHeight / 2, badgeWidth, badgeHeight, 12);
       badgeGraphics.fill();
       badgeGraphics.stroke();
       badgeContainer.addChild(badgeGraphics);
@@ -400,22 +407,22 @@ export default class PixiScene {
         this.onToggleConnectionParity(connId);
       });
       badgeGraphics.on('pointerover', () => {
-        badgeGraphics.setStrokeStyle({ width: 2, color: 0xffffff, alpha: 1 });
+        badgeGraphics.setStrokeStyle({ width: 2, color: isOdd ? 0xb45309 : 0x5b21b6, alpha: 1 });
         badgeGraphics.stroke();
       });
       badgeGraphics.on('pointerout', () => {
-        badgeGraphics.setStrokeStyle({ width: 1.5, color: badgeBorder, alpha: 0.85 });
+        badgeGraphics.setStrokeStyle({ width: 1.5, color: badgeBorder, alpha: 1 });
         badgeGraphics.stroke();
       });
 
       // Small Delete Button (✕) next to the badge
       const delContainer = new PIXI.Container();
-      delContainer.x = x + badgeWidth / 2 + 13;
+      delContainer.x = x + badgeWidth / 2 + 14;
       delContainer.y = midY;
 
       const delBg = new PIXI.Graphics();
-      delBg.fill({ color: 0x1e293b, alpha: 0.9 });
-      delBg.setStrokeStyle({ width: 1, color: 0x64748b, alpha: 0.6 });
+      delBg.fill({ color: 0xffffff, alpha: 0.98 });
+      delBg.setStrokeStyle({ width: 1, color: 0xcbd5e1, alpha: 1 });
       delBg.circle(0, 0, 8);
       delBg.fill();
       delBg.stroke();
@@ -425,7 +432,7 @@ export default class PixiScene {
         style: {
           fontFamily: 'system-ui',
           fontSize: 9,
-          fill: 0x94a3b8,
+          fill: 0x64748b,
         },
       });
       delText.anchor.set(0.5, 0.5);
@@ -437,19 +444,19 @@ export default class PixiScene {
 
       delContainer.on('pointerover', () => {
         delBg.clear();
-        delBg.fill({ color: 0xef4444, alpha: 0.9 });
+        delBg.fill({ color: 0xef4444, alpha: 1 });
         delBg.circle(0, 0, 8);
         delBg.fill();
         delText.style.fill = 0xffffff;
       });
       delContainer.on('pointerout', () => {
         delBg.clear();
-        delBg.fill({ color: 0x1e293b, alpha: 0.9 });
-        delBg.setStrokeStyle({ width: 1, color: 0x64748b, alpha: 0.6 });
+        delBg.fill({ color: 0xffffff, alpha: 0.98 });
+        delBg.setStrokeStyle({ width: 1, color: 0xcbd5e1, alpha: 1 });
         delBg.circle(0, 0, 8);
         delBg.fill();
         delBg.stroke();
-        delText.style.fill = 0x94a3b8;
+        delText.style.fill = 0x64748b;
       });
       delContainer.on('pointerdown', (e) => {
         e.stopPropagation();
