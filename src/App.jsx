@@ -444,8 +444,8 @@ export default function App() {
   return (
     <div className="w-full h-screen bg-slate-100 flex flex-col select-none overflow-hidden font-sans">
       {/* ── Top Navigation Bar ────────────────────────────────────────── */}
-      <header className="bg-white/95 backdrop-blur-md border-b border-slate-200 px-5 py-3 flex items-center justify-between gap-4 z-20 shadow-sm">
-        {/* Branding */}
+      <header className="bg-white/95 backdrop-blur-md border-b border-slate-200 px-5 py-3 flex items-center justify-between z-20 shadow-sm relative">
+        {/* Branding (Left) */}
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 p-[1.5px] shadow-md shadow-sky-500/20 flex items-center justify-center">
             <div className="w-full h-full bg-white rounded-[10px] flex items-center justify-center text-sky-600 font-mono font-bold text-base">
@@ -462,12 +462,24 @@ export default function App() {
           </div>
         </div>
 
-        {/* Action Controls */}
+        {/* Primary CTA: Generate Story (Centered in Top Bar) */}
+        <div className="absolute left-1/2 -translate-x-1/2 flex items-center">
+          <button
+            onClick={() => setShowStoryGenerator(true)}
+            className="px-5 py-2 bg-gradient-to-r from-sky-600 via-indigo-600 to-purple-600 hover:from-sky-700 hover:to-purple-700 text-white font-sans text-xs font-bold rounded-xl transition-all shadow-md shadow-indigo-200/50 flex items-center gap-2 active:scale-[0.98] border border-white/20 hover:shadow-lg"
+            title="Sample and generate complete narrative from quantum distribution"
+          >
+            <span className="text-sm">✨</span>
+            <span>Generate Story</span>
+          </button>
+        </div>
+
+        {/* Action Controls (Right) */}
         <div className="flex items-center gap-2.5">
           {/* Unsaved Indicator Badge */}
           {isDirty && (
             <span
-              className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg flex items-center gap-1 shadow-xs cursor-pointer hover:bg-amber-100 transition-colors"
+              className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer hover:bg-amber-100 transition-colors"
               onClick={() => setShowSaveLoadModal(true)}
               title="You have unsaved changes. Click to Save."
             >
@@ -475,39 +487,6 @@ export default function App() {
               <span>Unsaved</span>
             </span>
           )}
-
-          {/* Interactive Tutorial Button */}
-          <button
-            onClick={() => {
-              setShowTutorial(true);
-              setTutorialStep(1);
-            }}
-            className="px-3 py-1.5 rounded-xl border border-sky-200 bg-sky-50/80 hover:bg-sky-100 text-sky-800 text-xs font-semibold transition-all flex items-center gap-1.5 shadow-xs active:scale-[0.98]"
-            title="Start step-by-step tutorial: Build The Hero & The Dragon Story"
-          >
-            <span>🎓</span>
-            <span>Tutorial</span>
-          </button>
-
-          {/* Save & Load Button */}
-          <button
-            onClick={() => setShowSaveLoadModal(true)}
-            className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all flex items-center gap-1.5 shadow-xs active:scale-[0.98]"
-            title="Export JSON, load projects, or explore demo stories"
-          >
-            <span>💾</span>
-            <span>Save & Load</span>
-          </button>
-
-          {/* Primary CTA: Story Generator */}
-          <button
-            onClick={() => setShowStoryGenerator(true)}
-            className="px-4 py-1.5 bg-gradient-to-r from-sky-600 via-indigo-600 to-purple-600 hover:from-sky-700 hover:to-purple-700 text-white font-sans text-xs font-bold rounded-xl transition-all shadow-md shadow-indigo-100 flex items-center gap-1.5 active:scale-[0.98]"
-            title="Sample and generate complete narrative from quantum distribution"
-          >
-            <span>✨</span>
-            <span>Generate Story</span>
-          </button>
 
           {/* Overflow Menu Dropdown */}
           <div className="relative">
@@ -676,9 +655,7 @@ export default function App() {
             <span className="text-slate-300">·</span>
             <span><strong className="text-sky-700 font-semibold">Click line</strong> to place H-Gate</span>
             <span className="text-slate-300">·</span>
-            <span><strong className="text-rose-600 font-semibold">Click H-Gate</strong> to delete</span>
-            <span className="text-slate-300">·</span>
-            <span><strong className="text-indigo-600 font-semibold">Right-click H-Gate</strong> for bias menu</span>
+            <span><strong className="text-indigo-600 font-semibold">Right-click H-Gate</strong> for bias & delete menu</span>
             <span className="text-slate-300">·</span>
             <span><strong className="text-purple-700 font-semibold">Drag line-to-line</strong> to Entangle</span>
             <span className="text-slate-300">·</span>

@@ -149,19 +149,19 @@ export default class Worldline extends PIXI.Container {
                 diamondG.fill();
             };
 
-            const drawHoverRemove = () => {
+            const drawHover = () => {
                 diamondG.clear();
-                // Red glowing outline
-                diamondG.setStrokeStyle({ width: 2.5, color: 0xef4444, alpha: 0.8 });
-                diamondG.moveTo(cx, cy - s - 3);
-                diamondG.lineTo(cx + s + 3, cy);
-                diamondG.lineTo(cx, cy + s + 3);
-                diamondG.lineTo(cx - s - 3, cy);
+                // Subtle bright blue outline on hover
+                diamondG.setStrokeStyle({ width: 2.5, color: 0x0284c7, alpha: 0.9 });
+                diamondG.moveTo(cx, cy - s - 2);
+                diamondG.lineTo(cx + s + 2, cy);
+                diamondG.lineTo(cx, cy + s + 2);
+                diamondG.lineTo(cx - s - 2, cy);
                 diamondG.closePath();
                 diamondG.stroke();
 
-                // Red filled inner diamond
-                diamondG.fill({ color: 0xef4444, alpha: 1 });
+                // Filled inner diamond
+                diamondG.fill({ color: 0x0284c7, alpha: 0.95 });
                 diamondG.moveTo(cx, cy - s);
                 diamondG.lineTo(cx + s, cy);
                 diamondG.lineTo(cx, cy + s);
@@ -201,17 +201,13 @@ export default class Worldline extends PIXI.Container {
             hitArea.eventMode = 'static';
             hitArea.cursor = 'pointer';
 
-            // Hover state: highlights in red with action hints
+            // Hover state: subtle accent, no tooltip text change
             hitArea.on('pointerover', () => {
-                drawHoverRemove();
-                label.text = '✕ Delete (Right-click: Menu)';
-                label.style.fill = 0xef4444;
+                drawHover();
             });
 
             hitArea.on('pointerout', () => {
                 drawNormal();
-                label.text = gateText;
-                label.style.fill = 0x0369a1;
             });
 
             const handleGateInteraction = (e) => {
@@ -220,24 +216,16 @@ export default class Worldline extends PIXI.Container {
                     e.nativeEvent.preventDefault();
                 }
 
-                const isRight = e.button === 2 || e.nativeEvent?.button === 2;
-                if (isRight) {
-                    const screenX = e.client?.x || e.global?.x || cx;
-                    const screenY = e.client?.y || e.global?.y || cy;
-                    this.emit('gate-contextmenu', {
-                        qubitId: this.qubitId,
-                        gateId: gate.id,
-                        gate,
-                        screenX,
-                        screenY,
-                    });
-                } else {
-                    // Left click removes immediately
-                    this.emit('remove-gate', {
-                        qubitId: this.qubitId,
-                        gateId: gate.id,
-                    });
-                }
+                // Open context menu (slider + delete option)
+                const screenX = e.client?.x || e.global?.x || cx;
+                const screenY = e.client?.y || e.global?.y || cy;
+                this.emit('gate-contextmenu', {
+                    qubitId: this.qubitId,
+                    gateId: gate.id,
+                    gate,
+                    screenX,
+                    screenY,
+                });
             };
 
             hitArea.on('pointerdown', handleGateInteraction);
