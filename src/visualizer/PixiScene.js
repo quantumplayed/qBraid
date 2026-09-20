@@ -553,7 +553,7 @@ export default class PixiScene {
     const { padding, lineWidth, h } = this._getLayout();
     const usableStart = padding + 138;
     const usableWidth = lineWidth - 138;
-    const trackY = 32;
+    const trackY = h - 28;
 
     const g = new PIXI.Graphics();
 
@@ -594,7 +594,7 @@ export default class PixiScene {
     });
     label0.anchor.set(0, 0.5);
     label0.x = usableStart;
-    label0.y = trackY - 10;
+    label0.y = trackY - 11;
     this._scrubberLayer.addChild(label0);
 
     const label1 = new PIXI.Text({
@@ -608,19 +608,19 @@ export default class PixiScene {
     });
     label1.anchor.set(1, 0.5);
     label1.x = usableStart + usableWidth;
-    label1.y = trackY - 10;
+    label1.y = trackY - 11;
     this._scrubberLayer.addChild(label1);
 
-    // Vertical holographic laser line down through all worldlines
+    // Vertical holographic laser line up through all worldlines
     const laser = new PIXI.Graphics();
     laser.setStrokeStyle({ width: 4, color: railColor, alpha: 0.22 });
-    laser.moveTo(curX, trackY + 8);
-    laser.lineTo(curX, h - 20);
+    laser.moveTo(curX, trackY - 8);
+    laser.lineTo(curX, padding - 15);
     laser.stroke();
 
     laser.setStrokeStyle({ width: 1.5, color: railColor, alpha: 0.85 });
-    laser.moveTo(curX, trackY + 8);
-    laser.lineTo(curX, h - 20);
+    laser.moveTo(curX, trackY - 8);
+    laser.lineTo(curX, padding - 15);
     laser.stroke();
     this._scrubberLayer.addChild(laser);
 
@@ -643,7 +643,7 @@ export default class PixiScene {
     handle.addChild(handleG);
     handle.eventMode = 'static';
     handle.cursor = 'ew-resize';
-    handle.hitArea = new PIXI.Rectangle(-14, -14, 28, 28);
+    handle.hitArea = new PIXI.Rectangle(-16, -16, 32, 32);
 
     handle.on('pointerdown', (e) => {
       e.stopPropagation();
@@ -654,7 +654,7 @@ export default class PixiScene {
     // Track click hit zone for direct clicking anywhere on the timeline rail
     const trackHit = new PIXI.Graphics();
     trackHit.fill({ color: 0x000000, alpha: 0.001 });
-    trackHit.rect(usableStart - 10, trackY - 12, usableWidth + 20, 24);
+    trackHit.rect(usableStart - 10, trackY - 14, usableWidth + 20, 28);
     trackHit.fill();
     trackHit.eventMode = 'static';
     trackHit.cursor = 'ew-resize';
@@ -688,7 +688,8 @@ export default class PixiScene {
   }
 
   _isNearConnection(x, y) {
-    if (y <= 50) return true; // Scrubber zone
+    const { h } = this._getLayout();
+    if (y >= h - 48) return true; // Scrubber zone at the bottom
 
     for (const conn of this.connections) {
       if (conn.type !== 'CNOT') continue;
@@ -733,12 +734,13 @@ export default class PixiScene {
     const x = e.global.x;
     const y = e.global.y;
 
-    const { padding, lineWidth } = this._getLayout();
+    const { padding, lineWidth, h } = this._getLayout();
     const usableStart = padding + 138;
     const usableWidth = lineWidth - 138;
+    const trackY = h - 28;
 
-    // Timeline Scrubber track click / drag
-    if (y >= 16 && y <= 50 && x >= usableStart - 12 && x <= usableStart + usableWidth + 12) {
+    // Timeline Scrubber track click / drag at the bottom
+    if (y >= trackY - 16 && y <= h && x >= usableStart - 12 && x <= usableStart + usableWidth + 12) {
       this._scrubberDragging = true;
       this._linePointerDown = null;
       const frac = Math.max(0, Math.min(1, (x - usableStart) / usableWidth));

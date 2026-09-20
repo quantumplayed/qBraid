@@ -99,27 +99,47 @@ export default class Worldline extends PIXI.Container {
             ? startX + totalUsableWidth * this.scrubberPosition
             : this.lineX + this.lineWidth;
 
-        let endX = this._shouldShimmer()
-            ? startX + this._getShimmerStartFraction() * totalUsableWidth
-            : this.lineX + this.lineWidth;
+        const glowColor = this.hasPhaseInterference ? 0xfde68a : 0x38bdf8;
+        const coreColor = this.hasPhaseInterference ? 0xd97706 : 0x0284c7;
 
-        endX = Math.min(endX, scrubberLimitX);
+        if (this._shouldShimmer()) {
+            const startFrac = this._getShimmerStartFraction();
+            const sx = startX + startFrac * totalUsableWidth;
+            const detEndX = Math.min(sx, scrubberLimitX);
 
-        if (endX > startX) {
-            const glowColor = this.hasPhaseInterference ? 0xfde68a : 0x38bdf8;
-            const coreColor = this.hasPhaseInterference ? 0xd97706 : 0x0284c7;
+            // Deterministic portion before superposition (solid opacity)
+            if (detEndX > startX) {
+                g.setStrokeStyle({ width: 5, color: glowColor, alpha: 0.28 });
+                g.moveTo(startX, this.lineY);
+                g.lineTo(detEndX, this.lineY);
+                g.stroke();
 
-            // Soft sky / amber glow
-            g.setStrokeStyle({ width: 5, color: glowColor, alpha: 0.28 });
-            g.moveTo(startX, this.lineY);
-            g.lineTo(endX, this.lineY);
-            g.stroke();
+                g.setStrokeStyle({ width: 2.5, color: coreColor, alpha: 1 });
+                g.moveTo(startX, this.lineY);
+                g.lineTo(detEndX, this.lineY);
+                g.stroke();
+            }
 
-            // Core line
-            g.setStrokeStyle({ width: 2.5, color: coreColor, alpha: 1 });
-            g.moveTo(startX, this.lineY);
-            g.lineTo(endX, this.lineY);
-            g.stroke();
+            // Visible baseline guide underneath superposition wave (never transparent)
+            if (scrubberLimitX > detEndX) {
+                g.setStrokeStyle({ width: 2, color: coreColor, alpha: 0.35 });
+                g.moveTo(detEndX, this.lineY);
+                g.lineTo(scrubberLimitX, this.lineY);
+                g.stroke();
+            }
+        } else {
+            // Entirely deterministic line up to scrubberLimitX
+            if (scrubberLimitX > startX) {
+                g.setStrokeStyle({ width: 5, color: glowColor, alpha: 0.28 });
+                g.moveTo(startX, this.lineY);
+                g.lineTo(scrubberLimitX, this.lineY);
+                g.stroke();
+
+                g.setStrokeStyle({ width: 2.5, color: coreColor, alpha: 1 });
+                g.moveTo(startX, this.lineY);
+                g.lineTo(scrubberLimitX, this.lineY);
+                g.stroke();
+            }
         }
     }
 
@@ -531,7 +551,7 @@ export default class Worldline extends PIXI.Container {
     }
 
     _getShimmerStartFraction() {
-        if (this.gates.length === 0) return 0.5;
+        if (this.gates.length === 0) return 0;
         return Math.min(...this.gates.map(g => g.position));
     }
 
@@ -596,26 +616,45 @@ export default class Worldline extends PIXI.Container {
             : this.lineX + this.lineWidth;
         const ex = Math.min(this.lineX + this.lineWidth, scrubberLimitX);
 
-        if (ex <= sx) return;
+        if (ex <= sx + 2) return;
 
-        const segmentCount = Math.max(8, Math.round((ex - sx) / 8));
-        const segLen = (ex - sx) / segmentCount;
+        const step = 4;
+        const glowColor = this.hasPhaseInterference ? 0xf59e0b : 0x38bdf8;
+        const coreColor = this.hasPhaseInterference ? 0xd97706 : 0x0284c7;
+        const rippleColor = this.hasPhaseInterference ? 0xec4899 : 0x6366f1;
 
-        // Dynamic light-mode wave with phase coloring
-        for (let i = 0; i < segmentCount; i++) {
-            const segSx = sx + i * segLen;
-            const segEx = segSx + segLen;
-            const phase = this._time * 3.0 + i * 0.45;
-            const alpha = 0.4 + Math.sin(phase) * 0.3;
-            const yOff = Math.sin(phase * 0.7) * 1.5;
-            const color = this.hasPhaseInterference
-                ? (i % 2 === 0 ? 0xd97706 : 0xec4899)
-                : (i % 2 === 0 ? 0x0284c7 : 0x6366f1);
-
-            g.setStrokeStyle({ width: 2.5, color, alpha: Math.max(0.2, Math.min(0.9, alpha)) });
-            g.moveTo(segSx, this.lineY + yOff);
-            g.lineTo(segEx, this.lineY + Math.sin((phase + 0.45) * 0.7) * 1.5);
+        // 1. Soft glowing outer superposition wave
+        const glowPulse = 0.35 + 0.15 * Math.sin(this._time * 4);
+        g.setStrokeStyle({ width: 5.5, color: glowColor, alpha: glowPulse });
+        g.moveTo(sx, this.lineY + Math.sin(this._time * 5 + sx * 0.045) * 3.5);
+        for (let px = sx + step; px < ex; px += step) {
+            const y = this.lineY + Math.sin(this._time * 5 + px * 0.045) * 3.5;
+            g.lineTo(px, y);
         }
+        g.lineTo(ex, this.lineY + Math.sin(this._time * 5 + ex * 0.045) * 3.5);
+        g.stroke();
+
+        // 2. High-contrast core wave (richly visible and dynamic)
+        const coreAlpha = 0.85 + 0.12 * Math.sin(this._time * 3 + 1);
+        g.setStrokeStyle({ width: 2.8, color: coreColor, alpha: Math.min(1.0, coreAlpha) });
+        g.moveTo(sx, this.lineY + Math.sin(this._time * 5 + sx * 0.045) * 3.5);
+        for (let px = sx + step; px < ex; px += step) {
+            const y = this.lineY + Math.sin(this._time * 5 + px * 0.045) * 3.5;
+            g.lineTo(px, y);
+        }
+        g.lineTo(ex, this.lineY + Math.sin(this._time * 5 + ex * 0.045) * 3.5);
+        g.stroke();
+
+        // 3. Counter-phase harmonic ripple (quantum interference look)
+        const rippleAlpha = 0.75 + 0.2 * Math.cos(this._time * 3.5);
+        g.setStrokeStyle({ width: 1.8, color: rippleColor, alpha: Math.min(0.95, rippleAlpha) });
+        g.moveTo(sx, this.lineY - Math.sin(this._time * 3.8 + sx * 0.035) * 2.5);
+        for (let px = sx + step; px < ex; px += step) {
+            const y = this.lineY - Math.sin(this._time * 3.8 + px * 0.035) * 2.5;
+            g.lineTo(px, y);
+        }
+        g.lineTo(ex, this.lineY - Math.sin(this._time * 3.8 + ex * 0.035) * 2.5);
+        g.stroke();
     }
 
     _updateHoverDot() {
