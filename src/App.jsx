@@ -6,6 +6,9 @@ import StateDistributionModal from './components/StateDistributionModal';
 import StoryBeatsModal from './components/StoryBeatsModal';
 import NarrativeModal from './components/NarrativeModal';
 import GateSliderOverlay from './components/GateSliderOverlay';
+import AboutModal from './components/AboutModal';
+import QuantumBackendModal from './components/QuantumBackendModal';
+import { downloadInkFile } from './utils/inkExporter';
 
 const MAX_WORLDLINES = 10;
 
@@ -81,6 +84,22 @@ export default function App() {
   const [showStateDistribution, setShowStateDistribution] = useState(false);
   const [showStoryBeats, setShowStoryBeats] = useState(false);
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
+  const [showAboutModal, setShowAboutModal] = useState(false);
+  const [showBackendModal, setShowBackendModal] = useState(false);
+  const [backendConfig, setBackendConfig] = useState(() => {
+    try {
+      const saved = localStorage.getItem('quantum_backend_config');
+      if (saved) return JSON.parse(saved);
+    } catch { }
+    return {
+      providerId: 'quantum_inspire',
+      providerName: 'Quantum Inspire (TU Delft)',
+      endpoint: 'https://api.quantum-inspire.com',
+      device: 'QX-36-emulator',
+      apiKey: '',
+      shots: 1024,
+    };
+  });
   const [selectedQubit, setSelectedQubit] = useState(null);
   const [editingGate, setEditingGate] = useState(null); // { qubitId, gateId, gate, screenX, screenY }
 
@@ -403,6 +422,34 @@ export default function App() {
 
                   <div className="my-1.5 border-t border-slate-100" />
 
+                  {/* Studio & Game Integration */}
+                  <div className="px-3.5 py-1 text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold">
+                    Studio & Hardware
+                  </div>
+                  <button
+                    onClick={() => { setShowAboutModal(true); setShowOverflowMenu(false); }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 transition-colors font-medium"
+                  >
+                    <span>ℹ️</span>
+                    <span>About & Game Integration (Ink/Inky)</span>
+                  </button>
+                  <button
+                    onClick={() => { downloadInkFile(qubits, connections, simulator); setShowOverflowMenu(false); }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-sky-50 text-sky-700 flex items-center gap-2 transition-colors font-medium"
+                  >
+                    <span>📥</span>
+                    <span>Export Circuit to .ink File</span>
+                  </button>
+                  <button
+                    onClick={() => { setShowBackendModal(true); setShowOverflowMenu(false); }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-purple-50 text-purple-700 flex items-center gap-2 transition-colors font-medium"
+                  >
+                    <span>⚛️</span>
+                    <span>Live Quantum Backend (Delft)</span>
+                  </button>
+
+                  <div className="my-1.5 border-t border-slate-100" />
+
                   {/* Reset */}
                   <button
                     onClick={() => { resetCircuit(); setShowOverflowMenu(false); }}
@@ -458,14 +505,31 @@ export default function App() {
       {/* ── Footer Status Bar ────────────────────────────────────────── */}
       <footer className="bg-white/95 border-t border-slate-200 px-5 py-2 flex items-center justify-between text-[11px] font-sans text-slate-600 shadow-sm">
         <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1.5">
+          <button
+            onClick={() => setShowBackendModal(true)}
+            className="flex items-center gap-1.5 hover:bg-slate-100 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+            title="Configure Live Quantum Hardware Backend"
+          >
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Quantum Engine Online
-          </span>
+            <span className="font-semibold text-slate-700">QPU Backend:</span>
+            <span className="text-purple-700 font-medium">
+              {backendConfig.providerId === 'quantum_inspire'
+                ? `Quantum Inspire (${backendConfig.device})`
+                : backendConfig.providerName}
+            </span>
+            <span className="text-[10px] text-slate-400">⚙️</span>
+          </button>
           <span className="text-slate-300">|</span>
-          <span>10-Qubit Unitary Simulation Active</span>
+          <span>{qubits.length}-Qubit Unitary Simulation Active</span>
         </div>
         <div className="flex items-center gap-4 text-slate-500">
+          <button
+            onClick={() => setShowAboutModal(true)}
+            className="hover:text-sky-700 underline font-medium transition-colors cursor-pointer"
+          >
+            About & Ink Integration
+          </button>
+          <span>·</span>
           <span>Even Parity: Both Beats Co-occur (Φ⁺)</span>
           <span>·</span>
           <span>Odd Parity: Mutual Exclusion (Ψ⁺)</span>
@@ -528,6 +592,25 @@ export default function App() {
           onChange={handleUpdateGateTheta}
           onClose={() => setEditingGate(null)}
           onRemove={handleRemoveGate}
+        />
+      )}
+
+      {/* About & Game Integration Modal */}
+      {showAboutModal && (
+        <AboutModal
+          qubits={qubits}
+          connections={connections}
+          simulator={simulator}
+          onClose={() => setShowAboutModal(false)}
+        />
+      )}
+
+      {/* Live Quantum Hardware Backend Modal */}
+      {showBackendModal && (
+        <QuantumBackendModal
+          currentBackend={backendConfig}
+          onSaveBackend={(newConfig) => setBackendConfig(newConfig)}
+          onClose={() => setShowBackendModal(false)}
         />
       )}
     </div>
