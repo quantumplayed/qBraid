@@ -80,6 +80,7 @@ export default function App() {
   const [showStoryGenerator, setShowStoryGenerator] = useState(false);
   const [showStateDistribution, setShowStateDistribution] = useState(false);
   const [showStoryBeats, setShowStoryBeats] = useState(false);
+  const [showOverflowMenu, setShowOverflowMenu] = useState(false);
   const [selectedQubit, setSelectedQubit] = useState(null);
   const [editingGate, setEditingGate] = useState(null); // { qubitId, gateId, gate, screenX, screenY }
 
@@ -313,56 +314,107 @@ export default function App() {
 
         {/* Action Controls */}
         <div className="flex items-center gap-2.5">
-          {/* Preset Selector */}
-          <select
-            onChange={(e) => loadPreset(e.target.value)}
-            defaultValue="triad"
-            className="bg-white border border-slate-200 hover:border-slate-300 text-slate-700 text-xs font-medium py-1.5 px-3 rounded-xl focus:outline-none focus:border-sky-500 transition-colors cursor-pointer shadow-sm"
-          >
-            <option value="even_bell">Preset: Even Parity (Co-occur)</option>
-            <option value="odd_bell">Preset: Odd Parity (Conflict)</option>
-            <option value="triad">Preset: Triad of Fate</option>
-            <option value="epic_10">Preset: 10-Qubit Multiverse</option>
-          </select>
-
-          {/* Story Beats Modal Button */}
-          <button
-            onClick={() => setShowStoryBeats(true)}
-            className="px-3.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 hover:text-slate-900 rounded-xl font-sans text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm"
-            title="Edit story beats, characters, and narrative branches"
-          >
-            <span>📖</span>
-            <span>Story Beats</span>
-          </button>
-
-          {/* State Distribution Modal Button */}
-          <button
-            onClick={() => setShowStateDistribution(true)}
-            className="px-3.5 py-1.5 bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-800 hover:text-sky-900 rounded-xl font-sans text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm"
-            title="View full quantum state probability distribution"
-          >
-            <span>📊</span>
-            <span>State Distribution</span>
-          </button>
-
-          {/* Story Generator Modal Button */}
+          {/* Primary CTA: Story Generator */}
           <button
             onClick={() => setShowStoryGenerator(true)}
-            className="px-4 py-1.5 bg-gradient-to-r from-sky-600 via-indigo-600 to-purple-600 hover:from-sky-700 hover:to-purple-700 text-white font-sans text-xs font-bold rounded-xl transition-all shadow-md shadow-indigo-100 flex items-center gap-1.5"
+            className="px-4 py-1.5 bg-gradient-to-r from-sky-600 via-indigo-600 to-purple-600 hover:from-sky-700 hover:to-purple-700 text-white font-sans text-xs font-bold rounded-xl transition-all shadow-md shadow-indigo-100 flex items-center gap-1.5 active:scale-[0.98]"
             title="Sample and generate complete narrative from quantum distribution"
           >
             <span>✨</span>
             <span>Generate Story</span>
           </button>
 
-          {/* Reset Circuit */}
-          <button
-            onClick={resetCircuit}
-            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 rounded-xl transition-colors text-xs font-mono"
-            title="Clear all gates and connections"
-          >
-            ↺
-          </button>
+          {/* Overflow Menu Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowOverflowMenu(prev => !prev)}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-medium transition-all flex items-center gap-1.5 shadow-sm ${
+                showOverflowMenu
+                  ? 'bg-slate-100 border-slate-300 text-slate-900'
+                  : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
+              }`}
+              title="More presets, tools, and options"
+            >
+              <span>⚙️</span>
+              <span>Options</span>
+              <span className="text-[10px] text-slate-400">▾</span>
+            </button>
+
+            {showOverflowMenu && (
+              <>
+                <div
+                  className="fixed inset-0 z-30"
+                  onClick={() => setShowOverflowMenu(false)}
+                />
+                <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-2xl py-2 z-40 animate-in fade-in zoom-in-95 duration-100 text-slate-800 text-xs font-sans ring-1 ring-black/5">
+                  {/* Presets Header */}
+                  <div className="px-3.5 py-1 text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold">
+                    Multiverse Presets
+                  </div>
+                  <button
+                    onClick={() => { loadPreset('even_bell'); setShowOverflowMenu(false); }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 transition-colors"
+                  >
+                    <span>🤝</span>
+                    <span>Even Parity (Co-occur)</span>
+                  </button>
+                  <button
+                    onClick={() => { loadPreset('odd_bell'); setShowOverflowMenu(false); }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 transition-colors"
+                  >
+                    <span>⚔️</span>
+                    <span>Odd Parity (Conflict)</span>
+                  </button>
+                  <button
+                    onClick={() => { loadPreset('triad'); setShowOverflowMenu(false); }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 transition-colors"
+                  >
+                    <span>🎭</span>
+                    <span>Triad of Fate</span>
+                  </button>
+                  <button
+                    onClick={() => { loadPreset('epic_10'); setShowOverflowMenu(false); }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 transition-colors"
+                  >
+                    <span>🌌</span>
+                    <span>10-Qubit Multiverse</span>
+                  </button>
+
+                  <div className="my-1.5 border-t border-slate-100" />
+
+                  {/* Tools Header */}
+                  <div className="px-3.5 py-1 text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold">
+                    Multiverse Tools
+                  </div>
+                  <button
+                    onClick={() => { setShowStoryBeats(true); setShowOverflowMenu(false); }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 transition-colors font-medium"
+                  >
+                    <span>📖</span>
+                    <span>Story Beats & Characters</span>
+                  </button>
+                  <button
+                    onClick={() => { setShowStateDistribution(true); setShowOverflowMenu(false); }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 transition-colors font-medium"
+                  >
+                    <span>📊</span>
+                    <span>State Distribution</span>
+                  </button>
+
+                  <div className="my-1.5 border-t border-slate-100" />
+
+                  {/* Reset */}
+                  <button
+                    onClick={() => { resetCircuit(); setShowOverflowMenu(false); }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-rose-50 text-rose-600 flex items-center gap-2 transition-colors font-medium"
+                  >
+                    <span>↺</span>
+                    <span>Reset Circuit</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </header>
 
@@ -377,6 +429,7 @@ export default function App() {
           onEditQubit={(qubit) => setSelectedQubit(qubit)}
           onPlaceGate={handlePlaceGate}
           onRemoveGate={handleRemoveGateDirect}
+          onGateContextMenu={setEditingGate}
           onEditGate={handleEditGate}
           onRemoveConnection={handleRemoveConnection}
           onRemoveWorldline={removeWorldlineById}
@@ -391,7 +444,9 @@ export default function App() {
             <span className="text-slate-300">·</span>
             <span><strong className="text-sky-700 font-semibold">Click line</strong> to place H-Gate</span>
             <span className="text-slate-300">·</span>
-            <span><strong className="text-rose-600 font-semibold">Click H-Gate</strong> to remove</span>
+            <span><strong className="text-rose-600 font-semibold">Click H-Gate</strong> to delete</span>
+            <span className="text-slate-300">·</span>
+            <span><strong className="text-indigo-600 font-semibold">Right-click H-Gate</strong> for bias menu</span>
             <span className="text-slate-300">·</span>
             <span><strong className="text-purple-700 font-semibold">Drag line-to-line</strong> to Entangle</span>
             <span className="text-slate-300">·</span>

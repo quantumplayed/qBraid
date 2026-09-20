@@ -19,6 +19,7 @@ export default class PixiScene {
     this.onEditQubit = options.onEditQubit || (() => { });
     this.onPlaceGate = options.onPlaceGate || (() => { });
     this.onEditGate = options.onEditGate || (() => { });
+    this.onGateContextMenu = options.onGateContextMenu || (() => { });
     this.onRemoveGate = options.onRemoveGate || (() => { });
     this.onRemoveConnection = options.onRemoveConnection || (() => { });
     this.onRemoveWorldline = options.onRemoveWorldline || (() => { });
@@ -83,14 +84,15 @@ export default class PixiScene {
       }
 
       this.container.appendChild(this.app.canvas);
+      this.app.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
       this.stage = this.app.stage;
 
-      // Layers (bottom to top)
-      this._connectionLayer = new PIXI.Container();
-      this.stage.addChild(this._connectionLayer);
-
+      // Layers (bottom to top: worldlines -> connections -> drag thread)
       this._worldlineLayer = new PIXI.Container();
       this.stage.addChild(this._worldlineLayer);
+
+      this._connectionLayer = new PIXI.Container();
+      this.stage.addChild(this._connectionLayer);
 
       this._dragThread = new PIXI.Graphics();
       this.stage.addChild(this._dragThread);
@@ -187,6 +189,9 @@ export default class PixiScene {
       });
       wl.on('edit-gate', (data) => {
         this.onEditGate(data);
+      });
+      wl.on('gate-contextmenu', (data) => {
+        this.onGateContextMenu(data);
       });
       wl.on('remove-gate', (data) => {
         this.onRemoveGate(data.qubitId, data.gateId);

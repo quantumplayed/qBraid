@@ -46,10 +46,10 @@ export default class Worldline extends PIXI.Container {
         this._buildTrackGuideline();
         this._buildStaticLine();
         this._buildShimmerLine();
+        this._buildHitArea();
         this._buildGateDiamonds();
         this._buildHoverDot();
         this._buildStartNodeCard();
-        this._buildHitArea();
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -193,18 +193,18 @@ export default class Worldline extends PIXI.Container {
             label.y = cy - s - 5;
             diamondContainer.addChild(label);
 
-            // Hit area for clicking the diamond -> removes gate!
+            // Hit area for clicking or right-clicking the diamond
             const hitArea = new PIXI.Graphics();
             hitArea.fill({ color: 0x000000, alpha: 0.001 });
-            hitArea.rect(cx - 16, cy - 16, 32, 32);
+            hitArea.rect(cx - 18, cy - 18, 36, 36);
             hitArea.fill();
-            hitArea.interactive = true;
+            hitArea.eventMode = 'static';
             hitArea.cursor = 'pointer';
 
-            // Hover state: highlights in red with "✕ Remove"
+            // Hover state: highlights in red with action hints
             hitArea.on('pointerover', () => {
                 drawHoverRemove();
-                label.text = '✕ Remove';
+                label.text = '✕ Delete (Right-click: Menu)';
                 label.style.fill = 0xef4444;
             });
 
@@ -214,14 +214,35 @@ export default class Worldline extends PIXI.Container {
                 label.style.fill = 0x0369a1;
             });
 
-            // Click -> Remove Gate immediately
-            hitArea.on('pointerdown', (e) => {
+            const handleGateInteraction = (e) => {
                 e.stopPropagation();
-                this.emit('remove-gate', {
-                    qubitId: this.qubitId,
-                    gateId: gate.id,
-                });
-            });
+                if (e.nativeEvent?.preventDefault) {
+                    e.nativeEvent.preventDefault();
+                }
+
+                const isRight = e.button === 2 || e.nativeEvent?.button === 2;
+                if (isRight) {
+                    const screenX = e.client?.x || e.global?.x || cx;
+                    const screenY = e.client?.y || e.global?.y || cy;
+                    this.emit('gate-contextmenu', {
+                        qubitId: this.qubitId,
+                        gateId: gate.id,
+                        gate,
+                        screenX,
+                        screenY,
+                    });
+                } else {
+                    // Left click removes immediately
+                    this.emit('remove-gate', {
+                        qubitId: this.qubitId,
+                        gateId: gate.id,
+                    });
+                }
+            };
+
+            hitArea.on('pointerdown', handleGateInteraction);
+            hitArea.on('rightdown', handleGateInteraction);
+            hitArea.on('rightclick', handleGateInteraction);
 
             diamondContainer.addChild(hitArea);
             this.gateContainer.addChild(diamondContainer);
@@ -437,6 +458,12 @@ export default class Worldline extends PIXI.Container {
         this.hitZone.on('pointerup', (e) => {
             const elapsed = Date.now() - this._pointerDownTime;
             this._pointerDownTime = 0;
+
+            // Ignore right-click events
+            if (e.button === 2 || e.nativeEvent?.button === 2) {
+                this._isDragging = false;
+                return;
+            }
 
             if (!this._isDragging && elapsed < this._CLICK_MAX_MS) {
                 const clickX = e.global.x;
