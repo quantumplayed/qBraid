@@ -1,0 +1,12 @@
+/* TEST: This should make all gates BRIGHT RED with HUGE yellow border */
+.gate-box {
+  background: red !important;
+  border: 10px solid yellow !important;
+  box-shadow: 0 0 50px yellow !important;
+  transform: scale(1.5) !important;
+}
+
+.narrative-card-enhanced {
+  background: orange !important;
+  border: 5px solid lime !important;
+}
