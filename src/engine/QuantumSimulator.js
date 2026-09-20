@@ -223,4 +223,81 @@ export class QuantumSimulator {
             beatOutcomes
         };
     }
+
+    /**
+     * Returns detailed state information including signed amplitudes, complex phases,
+     * and a flag indicating if negative/destructive phase interference exists.
+     */
+    getDetailedState(activeCount = this.numQubits) {
+        const system = this.getJointSystem(activeCount);
+        const totalStates = system.totalDimension;
+        const states = [];
+        let hasPhaseInterference = false;
+
+        for (let i = 0; i < totalStates; i++) {
+            const amp = system.jointAmplitudes[i] || { re: 0, im: 0 };
+            const re = amp.re || 0;
+            const im = amp.im || 0;
+            const prob = re * re + im * im;
+            const mag = Math.sqrt(prob);
+            const phaseRad = Math.atan2(im, re);
+            const phaseDeg = Math.round((phaseRad * 180 / Math.PI + 360) % 360);
+            const isNegative = re < -0.001;
+            const hasPhase = Math.abs(phaseDeg) > 5 && Math.abs(phaseDeg - 360) > 5;
+            if (prob > 0.001 && (isNegative || hasPhase)) {
+                hasPhaseInterference = true;
+            }
+
+            states.push({
+                index: i,
+                bitstring: this.indexToBitstring(i, activeCount),
+                probability: prob,
+                percent: (prob * 100).toFixed(1),
+                amplitudeRe: re,
+                amplitudeIm: im,
+                magnitude: mag,
+                phaseDeg,
+                phaseRad,
+                sign: isNegative ? '-' : '+'
+            });
+        }
+
+        const activeBranches = states.filter(s => s.probability > 0.0001);
+
+        return {
+            states,
+            activeBranches,
+            hasPhaseInterference,
+            totalStates
+        };
+    }
+
+    /**
+     * Evaluates circuit up to a given time slice position (0.0 to 1.0).
+     */
+    getSliceState(allEvents = [], position = 1.0, activeCount = this.numQubits) {
+        this.reset();
+        const sorted = [...allEvents].sort((a, b) => a.position - b.position);
+        const appliedEvents = sorted.filter(e => e.position <= position);
+
+        for (const evt of appliedEvents) {
+            this.applyGate(evt.type, evt.target, evt.control ?? null, evt.params || {});
+        }
+
+        const detailed = this.getDetailedState(activeCount);
+        const marginals = {};
+        for (let qi = 0; qi < activeCount; qi++) {
+            marginals[qi] = this.getEntityProbabilities(qi);
+        }
+
+        return {
+            ...detailed,
+            position,
+            appliedEvents,
+            appliedEventCount: appliedEvents.length,
+            totalEventCount: sorted.length,
+            marginals
+        };
+    }
 }
+

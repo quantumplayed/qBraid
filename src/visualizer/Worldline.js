@@ -25,6 +25,8 @@ export default class Worldline extends PIXI.Container {
         this.lineWidth = lineWidth;
         this.gates = gates;
         this.isUncertain = isUncertain;
+        this.hasPhaseInterference = options.hasPhaseInterference || false;
+        this.scrubberPosition = options.scrubberPosition ?? 1.0;
 
         // Node pill width offset: line starts after the start node pill
         this.START_NODE_WIDTH = 130;
@@ -83,21 +85,29 @@ export default class Worldline extends PIXI.Container {
         const startX = this.lineX + this.START_NODE_WIDTH + 8;
         const totalUsableWidth = this.lineWidth - this.START_NODE_WIDTH - 8;
 
-        const endX = this._shouldShimmer()
+        const scrubberLimitX = startX + totalUsableWidth * this.scrubberPosition;
+        let endX = this._shouldShimmer()
             ? startX + this._getShimmerStartFraction() * totalUsableWidth
             : this.lineX + this.lineWidth;
 
-        // Soft sky glow
-        g.setStrokeStyle({ width: 5, color: 0x38bdf8, alpha: 0.22 });
-        g.moveTo(startX, this.lineY);
-        g.lineTo(endX, this.lineY);
-        g.stroke();
+        endX = Math.min(endX, scrubberLimitX);
 
-        // Core line in rich sky blue
-        g.setStrokeStyle({ width: 2.5, color: 0x0284c7, alpha: 1 });
-        g.moveTo(startX, this.lineY);
-        g.lineTo(endX, this.lineY);
-        g.stroke();
+        if (endX > startX) {
+            const glowColor = this.hasPhaseInterference ? 0xfde68a : 0x38bdf8;
+            const coreColor = this.hasPhaseInterference ? 0xd97706 : 0x0284c7;
+
+            // Soft sky / amber glow
+            g.setStrokeStyle({ width: 5, color: glowColor, alpha: 0.28 });
+            g.moveTo(startX, this.lineY);
+            g.lineTo(endX, this.lineY);
+            g.stroke();
+
+            // Core line
+            g.setStrokeStyle({ width: 2.5, color: coreColor, alpha: 1 });
+            g.moveTo(startX, this.lineY);
+            g.lineTo(endX, this.lineY);
+            g.stroke();
+        }
     }
 
     _buildShimmerLine() {
@@ -117,21 +127,28 @@ export default class Worldline extends PIXI.Container {
         const startX = this.lineX + this.START_NODE_WIDTH + 8;
         const totalUsableWidth = this.lineWidth - this.START_NODE_WIDTH - 8;
 
-        for (const gate of this.gates) {
+        for (let gi = 0; gi < this.gates.length; gi++) {
+            const gate = this.gates[gi];
             const cx = startX + gate.position * totalUsableWidth;
             const cy = this.lineY;
             const s = 8;
 
+            const isFuture = gate.position > (this.scrubberPosition + 0.005);
+            const isPhaseGate = this.hasPhaseInterference && gi > 0;
+
             const diamondContainer = new PIXI.Container();
+            diamondContainer.alpha = isFuture ? 0.28 : 1.0;
 
             // Diamond graphics
             const diamondG = new PIXI.Graphics();
+            const gateCoreColor = isPhaseGate ? 0xd97706 : 0x0284c7;
+            const gateGlowColor = isPhaseGate ? 0xf59e0b : 0x0284c7;
 
             // Default look
             const drawNormal = () => {
                 diamondG.clear();
                 // Outer glow
-                diamondG.setStrokeStyle({ width: 2, color: 0x0284c7, alpha: 0.4 });
+                diamondG.setStrokeStyle({ width: 2, color: gateGlowColor, alpha: isPhaseGate ? 0.6 : 0.4 });
                 diamondG.moveTo(cx, cy - s - 3);
                 diamondG.lineTo(cx + s + 3, cy);
                 diamondG.lineTo(cx, cy + s + 3);
@@ -140,7 +157,7 @@ export default class Worldline extends PIXI.Container {
                 diamondG.stroke();
 
                 // Inner diamond
-                diamondG.fill({ color: 0x0284c7, alpha: 1 });
+                diamondG.fill({ color: gateCoreColor, alpha: 1 });
                 diamondG.moveTo(cx, cy - s);
                 diamondG.lineTo(cx + s, cy);
                 diamondG.lineTo(cx, cy + s);
@@ -151,8 +168,7 @@ export default class Worldline extends PIXI.Container {
 
             const drawHover = () => {
                 diamondG.clear();
-                // Subtle bright blue outline on hover
-                diamondG.setStrokeStyle({ width: 2.5, color: 0x0284c7, alpha: 0.9 });
+                diamondG.setStrokeStyle({ width: 2.5, color: gateCoreColor, alpha: 0.95 });
                 diamondG.moveTo(cx, cy - s - 2);
                 diamondG.lineTo(cx + s + 2, cy);
                 diamondG.lineTo(cx, cy + s + 2);
@@ -160,8 +176,7 @@ export default class Worldline extends PIXI.Container {
                 diamondG.closePath();
                 diamondG.stroke();
 
-                // Filled inner diamond
-                diamondG.fill({ color: 0x0284c7, alpha: 0.95 });
+                diamondG.fill({ color: gateCoreColor, alpha: 0.95 });
                 diamondG.moveTo(cx, cy - s);
                 diamondG.lineTo(cx + s, cy);
                 diamondG.lineTo(cx, cy + s);
@@ -177,14 +192,14 @@ export default class Worldline extends PIXI.Container {
             const theta = gate.theta ?? (Math.PI / 2);
             const prob = Math.sin(theta / 2) ** 2;
             const isH = Math.abs(prob - 0.5) < 0.02;
-            const gateText = isH ? 'H' : `H(${Math.round(prob * 100)}%)`;
+            let gateText = isH ? (isPhaseGate ? 'H±' : 'H') : `H(${Math.round(prob * 100)}%)`;
 
             const label = new PIXI.Text({
                 text: gateText,
                 style: {
                     fontFamily: '"Inter", monospace, sans-serif',
                     fontSize: 9,
-                    fill: 0x0369a1,
+                    fill: isPhaseGate ? 0x92400e : 0x0369a1,
                     fontWeight: 'bold',
                 },
             });
@@ -519,7 +534,7 @@ export default class Worldline extends PIXI.Container {
         }
     }
 
-    updateData({ name, gates, isUncertain }) {
+    updateData({ name, gates, isUncertain, hasPhaseInterference, scrubberPosition }) {
         if (name !== undefined && name !== this.qubitName) {
             this.qubitName = name;
             if (this.cardLabel) this.cardLabel.text = name;
@@ -531,6 +546,14 @@ export default class Worldline extends PIXI.Container {
         }
         if (isUncertain !== undefined && isUncertain !== this.isUncertain) {
             this.isUncertain = isUncertain;
+            needsRedraw = true;
+        }
+        if (hasPhaseInterference !== undefined && hasPhaseInterference !== this.hasPhaseInterference) {
+            this.hasPhaseInterference = hasPhaseInterference;
+            needsRedraw = true;
+        }
+        if (scrubberPosition !== undefined && scrubberPosition !== this.scrubberPosition) {
+            this.scrubberPosition = scrubberPosition;
             needsRedraw = true;
         }
         if (needsRedraw) {
@@ -555,23 +578,28 @@ export default class Worldline extends PIXI.Container {
         const totalUsableWidth = this.lineWidth - this.START_NODE_WIDTH - 8;
         const startFrac = this._getShimmerStartFraction();
         const sx = startX + startFrac * totalUsableWidth;
-        const ex = this.lineX + this.lineWidth;
+        const scrubberLimitX = startX + totalUsableWidth * this.scrubberPosition;
+        const ex = Math.min(this.lineX + this.lineWidth, scrubberLimitX);
+
+        if (ex <= sx) return;
+
         const segmentCount = Math.max(8, Math.round((ex - sx) / 8));
         const segLen = (ex - sx) / segmentCount;
 
-        // Dynamic light-mode wave
+        // Dynamic light-mode wave with phase coloring
         for (let i = 0; i < segmentCount; i++) {
             const segSx = sx + i * segLen;
             const segEx = segSx + segLen;
             const phase = this._time * 3.0 + i * 0.45;
             const alpha = 0.4 + Math.sin(phase) * 0.3;
             const yOff = Math.sin(phase * 0.7) * 1.5;
-            const color = i % 2 === 0 ? 0x0284c7 : 0x6366f1;
+            const color = this.hasPhaseInterference
+                ? (i % 2 === 0 ? 0xd97706 : 0xec4899)
+                : (i % 2 === 0 ? 0x0284c7 : 0x6366f1);
 
             g.setStrokeStyle({ width: 2.5, color, alpha: Math.max(0.2, Math.min(0.9, alpha)) });
             g.moveTo(segSx, this.lineY + yOff);
             g.lineTo(segEx, this.lineY + Math.sin((phase + 0.45) * 0.7) * 1.5);
-            g.stroke();
         }
     }
 

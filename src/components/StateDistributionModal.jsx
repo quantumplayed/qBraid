@@ -14,32 +14,40 @@ export default function StateDistributionModal({
     const [filterNonZero, setFilterNonZero] = useState(true);
     const [sortBy, setSortBy] = useState('prob'); // 'prob' | 'index'
 
-    const { allStates, nonZeroCount, maxProb } = useMemo(() => {
+    const { allStates, nonZeroCount, maxProb, hasPhaseInterference } = useMemo(() => {
         const numActive = qubits.length;
-        const probs = simulator.getProbabilities(numActive);
-        const numStates = Math.pow(2, numActive);
+        const detailed = simulator.getDetailedState(numActive);
+        const numStates = detailed.totalStates;
 
         let maxP = 0;
         let nonZero = 0;
         const list = [];
 
         for (let i = 0; i < numStates; i++) {
-            const p = probs[i] || 0;
+            const st = detailed.states[i];
+            const p = st ? st.probability : 0;
             if (p > maxP) maxP = p;
             if (p > 0.0001) nonZero++;
 
             list.push({
                 index: i,
-                bitstring: simulator.indexToBitstring(i, numActive),
+                bitstring: st ? st.bitstring : simulator.indexToBitstring(i, numActive),
                 probability: p,
                 percent: (p * 100).toFixed(2),
+                amplitudeRe: st ? st.amplitudeRe : 0,
+                amplitudeIm: st ? st.amplitudeIm : 0,
+                magnitude: st ? st.magnitude : 0,
+                phaseDeg: st ? st.phaseDeg : 0,
+                sign: st ? st.sign : '+',
+                isNegative: st ? (st.amplitudeRe < -0.001) : false
             });
         }
 
         return {
             allStates: list,
             nonZeroCount: nonZero,
-            maxProb: maxP || 0.0001
+            maxProb: maxP || 0.0001,
+            hasPhaseInterference: detailed.hasPhaseInterference
         };
     }, [simulator, qubits]);
 
@@ -102,6 +110,12 @@ export default function StateDistributionModal({
                             <span className="text-slate-400">Consistent Outcomes (P &gt; 0): </span>
                             <span className="text-purple-700 font-bold">{nonZeroCount} branches</span>
                         </div>
+                        {hasPhaseInterference && (
+                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-800 font-semibold animate-pulse">
+                                <span>⚡</span>
+                                <span>Phase Interferences Present</span>
+                            </div>
+                        )}
                     </div>
 
                     {/* Filter / Sort Controls */}
@@ -126,6 +140,17 @@ export default function StateDistributionModal({
                     </div>
                 </div>
 
+                {/* Educational Banner for Phase Interference */}
+                {hasPhaseInterference && (
+                    <div className="px-6 py-2.5 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-200/80 flex items-start gap-2.5 text-xs text-amber-900">
+                        <span className="text-sm mt-0.5">💡</span>
+                        <div>
+                            <span className="font-bold">Quantum Phase & Interference Active: </span>
+                            Certain narrative branches carry negative amplitudes (<span className="font-mono font-bold text-amber-800">-0.50</span>, phase <span className="font-mono font-bold">180°</span>). Even when readout probabilities look uniform, this stored phase allows downstream beats to undergo destructive cancellation!
+                        </div>
+                    </div>
+                )}
+
                 {/* Body - Histogram & State Rows */}
                 <div className="flex-1 p-6 overflow-y-auto space-y-3 bg-slate-50/30">
                     {displayedStates.length === 0 ? (
@@ -142,22 +167,54 @@ export default function StateDistributionModal({
                                     key={st.index}
                                     className={`p-3.5 rounded-xl border transition-all ${
                                         isNonZero
-                                            ? 'bg-white border-slate-200 hover:border-sky-300 shadow-sm'
+                                            ? st.isNegative
+                                                ? 'bg-amber-50/30 border-amber-200 hover:border-amber-300 shadow-sm'
+                                                : 'bg-white border-slate-200 hover:border-sky-300 shadow-sm'
                                             : 'bg-white/40 border-slate-200/50 opacity-40'
                                     }`}
                                 >
                                     <div className="flex items-center justify-between gap-4 mb-2">
                                         <div className="flex items-center gap-3">
-                                            <span className="font-mono text-sm font-bold text-sky-800 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-200">
+                                            <span className={`font-mono text-sm font-bold px-2.5 py-1 rounded-lg border ${
+                                                st.isNegative
+                                                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                                    : 'bg-sky-50 text-sky-800 border-sky-200'
+                                            }`}>
                                                 |{st.bitstring}⟩
                                             </span>
                                             <span className="font-mono text-xs text-slate-500">
                                                 State #{st.index}
                                             </span>
+
+                                            {/* Amplitude & Phase Sign Badge */}
+                                            {isNonZero && (
+                                                <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono border ${
+                                                    st.isNegative
+                                                        ? 'bg-amber-100/80 border-amber-300 text-amber-900 font-semibold'
+                                                        : 'bg-sky-50 border-sky-200 text-sky-800 font-medium'
+                                                }`}>
+                                                    <span className={`w-2.5 h-2.5 rounded-full flex items-center justify-center text-[9px] font-bold ${
+                                                        st.isNegative ? 'bg-amber-500 text-white' : 'bg-sky-500 text-white'
+                                                    }`}>
+                                                        {st.sign}
+                                                    </span>
+                                                    <span>
+                                                        Amp: {st.amplitudeRe >= 0 ? '+' : ''}{st.amplitudeRe.toFixed(2)}
+                                                    </span>
+                                                    <span className="text-slate-400">|</span>
+                                                    <span className="text-[10px]">
+                                                        φ = {st.phaseDeg}°
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="flex items-center gap-3 font-mono">
-                                            <span className={`text-sm font-bold ${isNonZero ? 'text-purple-700' : 'text-slate-400'}`}>
+                                            <span className={`text-sm font-bold ${
+                                                isNonZero 
+                                                    ? (st.isNegative ? 'text-amber-800' : 'text-purple-700')
+                                                    : 'text-slate-400'
+                                            }`}>
                                                 {st.percent}%
                                             </span>
                                             {isNonZero && onOpenStoryGenerator && (
@@ -178,7 +235,9 @@ export default function StateDistributionModal({
                                             style={{
                                                 width: `${barWidth}%`,
                                                 background: isNonZero
-                                                    ? 'linear-gradient(to right, #0284c7, #7c3aed)'
+                                                    ? st.isNegative
+                                                        ? 'linear-gradient(to right, #d97706, #ec4899)'
+                                                        : 'linear-gradient(to right, #0284c7, #7c3aed)'
                                                     : '#cbd5e1'
                                             }}
                                         />

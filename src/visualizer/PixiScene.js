@@ -24,6 +24,11 @@ export default class PixiScene {
     this.onRemoveConnection = options.onRemoveConnection || (() => { });
     this.onRemoveWorldline = options.onRemoveWorldline || (() => { });
     this.onAddWorldline = options.onAddWorldline || (() => { });
+    this.onScrubberChange = options.onScrubberChange || (() => { });
+
+    this.hasPhaseInterference = options.hasPhaseInterference || false;
+    this.scrubberPosition = options.scrubberPosition ?? 1.0;
+    this.sliceInfo = options.sliceInfo || null;
 
     this.app = null;
     this.stage = null;
@@ -42,6 +47,10 @@ export default class PixiScene {
     this._dragCurrentY = 0;
     this._dragTime = 0;
     this._dragThread = null;
+
+    // Timeline Scrubber state
+    this._scrubberLayer = null;
+    this._scrubberDragging = false;
 
     // Cursor tracking
     this._cursorX = -1000;
@@ -126,6 +135,10 @@ export default class PixiScene {
       this._dragThread.eventMode = 'none';
       this.stage.addChild(this._dragThread);
 
+      this._scrubberLayer = new PIXI.Container();
+      this._scrubberLayer.eventMode = 'passive';
+      this.stage.addChild(this._scrubberLayer);
+
       this._potentialDrag = null;
       this._linePointerDown = null;
       this._rebuildWorldlines();
@@ -208,6 +221,8 @@ export default class PixiScene {
         lineWidth,
         gates: q.gates || [],
         isUncertain,
+        hasPhaseInterference: this.hasPhaseInterference,
+        scrubberPosition: this.scrubberPosition,
       });
 
       // Event listeners
@@ -243,6 +258,7 @@ export default class PixiScene {
     this._buildAddButton();
 
     this._drawConnections();
+    this._drawScrubber();
   }
 
   _buildAddButton() {
@@ -350,9 +366,11 @@ export default class PixiScene {
       const y1 = controlWl.lineY;
       const y2 = targetWl.lineY;
       const isOdd = conn.parity === 'odd';
+      const isFuture = pos > (this.scrubberPosition + 0.005);
 
       const connContainer = new PIXI.Container();
       connContainer.eventMode = 'passive';
+      connContainer.alpha = isFuture ? 0.28 : 1.0;
 
       // Theme colors based on parity (Modern Bright)
       const strokeColor = isOdd ? 0xd97706 : 0x7c3aed; // Amber vs Royal Purple
@@ -524,7 +542,195 @@ export default class PixiScene {
     }
   }
 
+  // ═══════════════════════════════════════════════════════════════════════
+  //  TIMELINE SCRUBBER
+  // ═══════════════════════════════════════════════════════════════════════
+
+  _drawScrubber() {
+    if (!this._scrubberLayer) return;
+    this._scrubberLayer.removeChildren();
+
+    const { padding, lineWidth, h } = this._getLayout();
+    const usableStart = padding + 138;
+    const usableWidth = lineWidth - 138;
+    const trackY = 32;
+
+    const g = new PIXI.Graphics();
+
+    // Subtle background timeline rail
+    g.setStrokeStyle({ width: 2, color: 0xe2e8f0, alpha: 0.9 });
+    g.moveTo(usableStart, trackY);
+    g.lineTo(usableStart + usableWidth, trackY);
+    g.stroke();
+
+    // Filled progress rail up to scrubberPosition
+    const curX = usableStart + usableWidth * this.scrubberPosition;
+    const railColor = this.hasPhaseInterference ? 0xd97706 : 0x0284c7;
+    g.setStrokeStyle({ width: 2.5, color: railColor, alpha: 0.95 });
+    g.moveTo(usableStart, trackY);
+    g.lineTo(curX, trackY);
+    g.stroke();
+
+    // Tick marks at 0%, 25%, 50%, 75%, 100%
+    [0, 0.25, 0.5, 0.75, 1.0].forEach(frac => {
+      const tx = usableStart + usableWidth * frac;
+      g.setStrokeStyle({ width: 1.5, color: 0x94a3b8, alpha: 0.7 });
+      g.moveTo(tx, trackY - 3);
+      g.lineTo(tx, trackY + 3);
+      g.stroke();
+    });
+
+    this._scrubberLayer.addChild(g);
+
+    // Labels at 0% and 100%
+    const label0 = new PIXI.Text({
+      text: 't=0 (Genesis)',
+      style: {
+        fontFamily: '"Inter", system-ui, sans-serif',
+        fontSize: 8.5,
+        fill: 0x94a3b8,
+        fontWeight: '500',
+      },
+    });
+    label0.anchor.set(0, 0.5);
+    label0.x = usableStart;
+    label0.y = trackY - 10;
+    this._scrubberLayer.addChild(label0);
+
+    const label1 = new PIXI.Text({
+      text: 't=1 (Destiny)',
+      style: {
+        fontFamily: '"Inter", system-ui, sans-serif',
+        fontSize: 8.5,
+        fill: 0x94a3b8,
+        fontWeight: '500',
+      },
+    });
+    label1.anchor.set(1, 0.5);
+    label1.x = usableStart + usableWidth;
+    label1.y = trackY - 10;
+    this._scrubberLayer.addChild(label1);
+
+    // Vertical holographic laser line down through all worldlines
+    const laser = new PIXI.Graphics();
+    laser.setStrokeStyle({ width: 4, color: railColor, alpha: 0.22 });
+    laser.moveTo(curX, trackY + 8);
+    laser.lineTo(curX, h - 20);
+    laser.stroke();
+
+    laser.setStrokeStyle({ width: 1.5, color: railColor, alpha: 0.85 });
+    laser.moveTo(curX, trackY + 8);
+    laser.lineTo(curX, h - 20);
+    laser.stroke();
+    this._scrubberLayer.addChild(laser);
+
+    // Draggable Scrubber Handle
+    const handle = new PIXI.Container();
+    handle.x = curX;
+    handle.y = trackY;
+
+    const handleG = new PIXI.Graphics();
+    handleG.fill({ color: 0xffffff, alpha: 1 });
+    handleG.setStrokeStyle({ width: 2, color: railColor, alpha: 1 });
+    handleG.roundRect(-7, -9, 14, 18, 5);
+    handleG.fill();
+    handleG.stroke();
+
+    handleG.fill({ color: railColor, alpha: 1 });
+    handleG.circle(0, 0, 2.5);
+    handleG.fill();
+
+    handle.addChild(handleG);
+    handle.eventMode = 'static';
+    handle.cursor = 'ew-resize';
+    handle.hitArea = new PIXI.Rectangle(-14, -14, 28, 28);
+
+    handle.on('pointerdown', (e) => {
+      e.stopPropagation();
+      this._scrubberDragging = true;
+      this._linePointerDown = null;
+    });
+
+    // Track click hit zone for direct clicking anywhere on the timeline rail
+    const trackHit = new PIXI.Graphics();
+    trackHit.fill({ color: 0x000000, alpha: 0.001 });
+    trackHit.rect(usableStart - 10, trackY - 12, usableWidth + 20, 24);
+    trackHit.fill();
+    trackHit.eventMode = 'static';
+    trackHit.cursor = 'ew-resize';
+    trackHit.on('pointerdown', (e) => {
+      e.stopPropagation();
+      this._scrubberDragging = true;
+      this._linePointerDown = null;
+      const frac = Math.max(0, Math.min(1, (e.global.x - usableStart) / usableWidth));
+      this.scrubberPosition = frac;
+      this.onScrubberChange(frac);
+      this._drawScrubber();
+      this._updateWorldlinesForScrubber();
+    });
+
+    this._scrubberLayer.addChildAt(trackHit, 0);
+
+    // Floating HUD badge above handle
+    const hudContainer = new PIXI.Container();
+    const pct = Math.round(this.scrubberPosition * 100);
+    let previewText = `⏱ t = ${pct}%`;
+    if (this.sliceInfo) {
+      const activeCount = this.sliceInfo.activeBranches?.length || 1;
+      previewText += ` • ${activeCount} ${activeCount === 1 ? 'Branch' : 'Branches'}`;
+      if (this.sliceInfo.hasPhaseInterference) {
+        previewText += ' ⚡Phase';
+      }
+    }
+
+    const hudText = new PIXI.Text({
+      text: previewText,
+      style: {
+        fontFamily: '"Inter", monospace, sans-serif',
+        fontSize: 9,
+        fontWeight: 'bold',
+        fill: this.hasPhaseInterference ? 0x92400e : 0x0369a1,
+      },
+    });
+    hudText.anchor.set(0.5, 0.5);
+
+    const hudW = Math.max(76, hudText.width + 14);
+    const hudH = 17;
+
+    const hudBg = new PIXI.Graphics();
+    hudBg.fill({ color: 0xffffff, alpha: 0.96 });
+    hudBg.setStrokeStyle({ width: 1, color: railColor, alpha: 0.8 });
+    hudBg.roundRect(-hudW / 2, -hudH / 2, hudW, hudH, 8);
+    hudBg.fill();
+    hudBg.stroke();
+
+    hudContainer.addChild(hudBg);
+    hudContainer.addChild(hudText);
+
+    const hudX = Math.max(usableStart + hudW / 2, Math.min(usableStart + usableWidth - hudW / 2, curX));
+    hudContainer.x = hudX;
+    hudContainer.y = trackY - 17;
+
+    this._scrubberLayer.addChild(handle);
+    this._scrubberLayer.addChild(hudContainer);
+  }
+
+  _updateWorldlinesForScrubber() {
+    for (let i = 0; i < this.worldlines.length; i++) {
+      const wl = this.worldlines[i];
+      if (wl) {
+        wl.updateData({
+          hasPhaseInterference: this.hasPhaseInterference,
+          scrubberPosition: this.scrubberPosition,
+        });
+      }
+    }
+    this._drawConnections();
+  }
+
   _isNearConnection(x, y) {
+    if (y <= 50) return true; // Scrubber zone
+
     for (const conn of this.connections) {
       if (conn.type !== 'CNOT') continue;
       const controlWl = this.worldlines[conn.control];
@@ -567,6 +773,22 @@ export default class PixiScene {
 
     const x = e.global.x;
     const y = e.global.y;
+
+    const { padding, lineWidth } = this._getLayout();
+    const usableStart = padding + 138;
+    const usableWidth = lineWidth - 138;
+
+    // Timeline Scrubber track click / drag
+    if (y >= 16 && y <= 50 && x >= usableStart - 12 && x <= usableStart + usableWidth + 12) {
+      this._scrubberDragging = true;
+      this._linePointerDown = null;
+      const frac = Math.max(0, Math.min(1, (x - usableStart) / usableWidth));
+      this.scrubberPosition = frac;
+      this.onScrubberChange(frac);
+      this._drawScrubber();
+      this._updateWorldlinesForScrubber();
+      return;
+    }
 
     // Do NOT place gates or start drags if clicking any CNOT connection element
     if (this._isNearConnection(x, y)) {
@@ -621,6 +843,19 @@ export default class PixiScene {
   _onPointerMove(e) {
     this._cursorX = e.global.x;
     this._cursorY = e.global.y;
+
+    // Detect timeline scrubber dragging
+    if (this._scrubberDragging) {
+      const { padding, lineWidth } = this._getLayout();
+      const usableStart = padding + 138;
+      const usableWidth = lineWidth - 138;
+      const frac = Math.max(0, Math.min(1, (this._cursorX - usableStart) / usableWidth));
+      this.scrubberPosition = frac;
+      this.onScrubberChange(frac);
+      this._drawScrubber();
+      this._updateWorldlinesForScrubber();
+      return;
+    }
 
     // Detect drag initiation from line press
     if (this._linePointerDown && !this._dragActive) {
@@ -678,6 +913,10 @@ export default class PixiScene {
 
   _onPointerUp(e) {
     this._potentialDrag = null;
+
+    if (this._scrubberDragging) {
+      this._scrubberDragging = false;
+    }
 
     // 1. If dragging an entanglement connection
     if (this._dragActive) {
@@ -850,6 +1089,28 @@ export default class PixiScene {
           isUncertain: uncertainty[q.id] ?? false,
         });
       }
+    }
+  }
+
+  updateScrubber(position, sliceInfo) {
+    this.scrubberPosition = position ?? 1.0;
+    if (sliceInfo !== undefined) {
+      this.sliceInfo = sliceInfo;
+      if (sliceInfo?.hasPhaseInterference !== undefined) {
+        this.hasPhaseInterference = sliceInfo.hasPhaseInterference;
+      }
+    }
+    if (this._ready) {
+      this._drawScrubber();
+      this._updateWorldlinesForScrubber();
+    }
+  }
+
+  updatePhaseInterference(hasPhase) {
+    this.hasPhaseInterference = hasPhase;
+    if (this._ready) {
+      this._drawScrubber();
+      this._updateWorldlinesForScrubber();
     }
   }
 

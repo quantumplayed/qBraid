@@ -8,6 +8,10 @@ export default function PixiWorldlineCanvas({
     qubits,
     connections,
     qubitUncertainty,
+    hasPhaseInterference = false,
+    scrubberPosition = 1.0,
+    sliceInfo = null,
+    onScrubberChange,
     onCNOTCreate,
     onToggleConnectionParity,
     onEditQubit,
@@ -26,6 +30,7 @@ export default function PixiWorldlineCanvas({
     // Stable callback refs
     const callbackRefs = useRef({});
     callbackRefs.current = {
+        onScrubberChange,
         onCNOTCreate,
         onToggleConnectionParity,
         onEditQubit,
@@ -48,6 +53,10 @@ export default function PixiWorldlineCanvas({
             qubits,
             connections,
             qubitUncertainty: qubitUncertainty || {},
+            hasPhaseInterference,
+            scrubberPosition,
+            sliceInfo,
+            onScrubberChange: (...args) => callbackRefs.current.onScrubberChange?.(...args),
             onCNOTCreate: (...args) => callbackRefs.current.onCNOTCreate?.(...args),
             onToggleConnectionParity: (...args) => callbackRefs.current.onToggleConnectionParity?.(...args),
             onEditQubit: (...args) => callbackRefs.current.onEditQubit?.(...args),
@@ -87,6 +96,18 @@ export default function PixiWorldlineCanvas({
         if (isFirstRender.current) return;
         sceneRef.current?.updateUncertainty(qubitUncertainty || {});
     }, [qubitUncertainty]);
+
+    // Sync scrubber and slice
+    useEffect(() => {
+        if (isFirstRender.current) return;
+        sceneRef.current?.updateScrubber(scrubberPosition, sliceInfo);
+    }, [scrubberPosition, sliceInfo]);
+
+    // Sync phase interference
+    useEffect(() => {
+        if (isFirstRender.current) return;
+        sceneRef.current?.updatePhaseInterference(hasPhaseInterference);
+    }, [hasPhaseInterference]);
 
     return (
         <div

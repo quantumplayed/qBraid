@@ -131,17 +131,17 @@ export default function App() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isDirty]);
 
-  // ── Simulator: compute per-qubit uncertainty & state distribution ───────
-  const { qubitUncertainty, probabilities } = useMemo(() => {
-    simulator.reset();
+  // ── Timeline Scrubber & Phase State ────────────────────────────────────
+  const [scrubberPosition, setScrubberPosition] = useState(1.0);
+  const [isScrubberPlaying, setIsScrubberPlaying] = useState(false);
 
-    // Gather all gates and connections
-    const allEvents = [];
-
+  // Gather all chronological circuit events (gates & connections)
+  const allEvents = useMemo(() => {
+    const list = [];
     for (let i = 0; i < qubits.length; i++) {
       for (const gate of (qubits[i].gates || [])) {
         const theta = gate.theta ?? (Math.PI / 2);
-        allEvents.push({
+        list.push({
           position: gate.position,
           type: 'Ry',
           target: i,
@@ -149,10 +149,8 @@ export default function App() {
         });
       }
     }
-
-    // Add connections (CNOT with even or odd parity)
     for (const conn of connections) {
-      allEvents.push({
+      list.push({
         position: conn.position ?? 0.5,
         type: 'CNOT',
         target: conn.target,
@@ -160,28 +158,53 @@ export default function App() {
         params: { parity: conn.parity || 'even' },
       });
     }
+    list.sort((a, b) => a.position - b.position);
+    return list;
+  }, [qubits, connections]);
 
-    // Sort chronologically by position along the worldline
-    allEvents.sort((a, b) => a.position - b.position);
+  // Current slice state at scrubberPosition
+  const sliceInfo = useMemo(() => {
+    return simulator.getSliceState(allEvents, scrubberPosition, qubits.length);
+  }, [simulator, allEvents, scrubberPosition, qubits.length]);
 
-    // Apply circuit to simulator
-    for (const evt of allEvents) {
-      simulator.applyGate(evt.type, evt.target, evt.control ?? null, evt.params || {});
-    }
+  const hasPhaseInterference = sliceInfo.hasPhaseInterference;
 
+  // Simulator: compute per-qubit uncertainty & state distribution from slice
+  const { qubitUncertainty, probabilities } = useMemo(() => {
     const n = qubits.length;
-    const probs = simulator.getProbabilities(n);
-
-    // Compute per-qubit reduced probabilities for visual shimmering natively via the engine
+    const probs = sliceInfo.states.map(s => s.probability);
     const uncertainty = {};
     for (let qi = 0; qi < n; qi++) {
-      const entityProbs = simulator.getEntityProbabilities(qi);
+      const entityProbs = sliceInfo.marginals[qi] || { 0: 1 };
       const prob1 = entityProbs[1] || 0;
       uncertainty[qubits[qi].id] = prob1 > 0.001 && prob1 < 0.999;
     }
-
     return { qubitUncertainty: uncertainty, probabilities: probs };
-  }, [qubits, connections, simulator]);
+  }, [qubits, sliceInfo]);
+
+  // Auto-play timeline evolution
+  useEffect(() => {
+    if (!isScrubberPlaying) return;
+    let animId;
+    let lastTime = performance.now();
+
+    const step = (time) => {
+      const dt = (time - lastTime) / 1000;
+      lastTime = time;
+      setScrubberPosition(prev => {
+        const next = prev + dt * 0.25; // 4 seconds full sweep
+        if (next >= 1.0) {
+          setIsScrubberPlaying(false);
+          return 1.0;
+        }
+        return next;
+      });
+      animId = requestAnimationFrame(step);
+    };
+
+    animId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(animId);
+  }, [isScrubberPlaying]);
 
   // ── Handlers ──────────────────────────────────────────────────────────
 
@@ -648,6 +671,10 @@ export default function App() {
           qubits={qubits}
           connections={connections}
           qubitUncertainty={qubitUncertainty}
+          hasPhaseInterference={hasPhaseInterference}
+          scrubberPosition={scrubberPosition}
+          sliceInfo={sliceInfo}
+          onScrubberChange={(pos) => setScrubberPosition(pos)}
           onCNOTCreate={addConnection}
           onToggleConnectionParity={handleToggleConnectionParity}
           onEditQubit={(qubit) => setSelectedQubit(qubit)}
@@ -674,6 +701,76 @@ export default function App() {
             <span className="text-slate-300">·</span>
             <span><strong className="text-amber-700 font-semibold">Click Parity Badge</strong> to toggle Even/Odd</span>
           </span>
+        </div>
+
+        {/* Floating Timeline Scrubber Controls */}
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-white/95 backdrop-blur-md px-4 py-2 rounded-2xl border border-slate-200/90 shadow-xl text-xs font-mono">
+          <button
+            onClick={() => { setIsScrubberPlaying(false); setScrubberPosition(0); }}
+            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+            title="Reset to Genesis (t=0)"
+          >
+            ⏮
+          </button>
+          <button
+            onClick={() => {
+              if (scrubberPosition >= 0.999) setScrubberPosition(0);
+              setIsScrubberPlaying(prev => !prev);
+            }}
+            className={`px-3 py-1 rounded-xl font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
+              isScrubberPlaying
+                ? 'bg-amber-500 text-white hover:bg-amber-600'
+                : 'bg-gradient-to-r from-sky-600 to-indigo-600 text-white hover:opacity-95'
+            }`}
+          >
+            <span>{isScrubberPlaying ? '⏸' : '⏵'}</span>
+            <span>{isScrubberPlaying ? 'Pause' : 'Play Evolution'}</span>
+          </button>
+          <button
+            onClick={() => { setIsScrubberPlaying(false); setScrubberPosition(1.0); }}
+            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+            title="Jump to Destiny (t=1.0)"
+          >
+            ⏭
+          </button>
+
+          <div className="h-4 w-[1px] bg-slate-200 mx-1" />
+
+          {/* Timeline Range Slider */}
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400 text-[10px]">t=0</span>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={Math.round(scrubberPosition * 100)}
+              onChange={(e) => {
+                setIsScrubberPlaying(false);
+                setScrubberPosition(Number(e.target.value) / 100);
+              }}
+              className="w-28 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-sky-600"
+            />
+            <span className="text-slate-400 text-[10px]">t=100%</span>
+          </div>
+
+          <div className="h-4 w-[1px] bg-slate-200 mx-1" />
+
+          {/* Live Dirac State Preview */}
+          <div className="flex items-center gap-2 max-w-sm overflow-hidden text-ellipsis whitespace-nowrap">
+            <span className="font-bold text-slate-800">
+              |Ψ({Math.round(scrubberPosition * 100)}%)⟩:
+            </span>
+            <span className="text-slate-700 text-[11px] font-semibold">
+              {sliceInfo.activeBranches.length === 1
+                ? `100% |${sliceInfo.activeBranches[0]?.bitstring}⟩`
+                : sliceInfo.activeBranches.slice(0, 4).map(b => `${b.sign}${b.magnitude.toFixed(2)}|${b.bitstring}⟩`).join(' + ') + (sliceInfo.activeBranches.length > 4 ? ' + …' : '')}
+            </span>
+            {hasPhaseInterference && (
+              <span className="px-1.5 py-0.5 rounded bg-amber-100 border border-amber-300 text-amber-900 text-[10px] font-bold">
+                ⚡Phase
+              </span>
+            )}
+          </div>
         </div>
       </main>
 
