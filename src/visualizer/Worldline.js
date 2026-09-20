@@ -590,6 +590,7 @@ export default class Worldline extends PIXI.Container {
         const startX = this.lineX + this.START_NODE_WIDTH + 8;
         const totalUsableWidth = this.lineWidth - this.START_NODE_WIDTH - 8;
         const startFrac = this._getShimmerStartFraction();
+        const sx = startX + startFrac * totalUsableWidth;
         const scrubberLimitX = (this.scrubberPosition !== undefined && this.scrubberPosition < 0.999)
             ? startX + totalUsableWidth * this.scrubberPosition
             : this.lineX + this.lineWidth;
