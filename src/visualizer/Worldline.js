@@ -15,7 +15,17 @@ import * as PIXI from 'pixi.js';
  *  - Drag from line body -> creates entanglement thread
  */
 export default class Worldline extends PIXI.Container {
-    constructor({ id, name, y, x, lineWidth, gates = [], isUncertain = false }) {
+    constructor({
+        id,
+        name,
+        y,
+        x,
+        lineWidth,
+        gates = [],
+        isUncertain = false,
+        hasPhaseInterference = false,
+        scrubberPosition = 1.0,
+    }) {
         super();
 
         this.qubitId = id;
@@ -25,8 +35,8 @@ export default class Worldline extends PIXI.Container {
         this.lineWidth = lineWidth;
         this.gates = gates;
         this.isUncertain = isUncertain;
-        this.hasPhaseInterference = options.hasPhaseInterference || false;
-        this.scrubberPosition = options.scrubberPosition ?? 1.0;
+        this.hasPhaseInterference = hasPhaseInterference || false;
+        this.scrubberPosition = scrubberPosition ?? 1.0;
 
         // Node pill width offset: line starts after the start node pill
         this.START_NODE_WIDTH = 130;
@@ -85,7 +95,10 @@ export default class Worldline extends PIXI.Container {
         const startX = this.lineX + this.START_NODE_WIDTH + 8;
         const totalUsableWidth = this.lineWidth - this.START_NODE_WIDTH - 8;
 
-        const scrubberLimitX = startX + totalUsableWidth * this.scrubberPosition;
+        const scrubberLimitX = (this.scrubberPosition !== undefined && this.scrubberPosition < 0.999)
+            ? startX + totalUsableWidth * this.scrubberPosition
+            : this.lineX + this.lineWidth;
+
         let endX = this._shouldShimmer()
             ? startX + this._getShimmerStartFraction() * totalUsableWidth
             : this.lineX + this.lineWidth;
@@ -577,8 +590,9 @@ export default class Worldline extends PIXI.Container {
         const startX = this.lineX + this.START_NODE_WIDTH + 8;
         const totalUsableWidth = this.lineWidth - this.START_NODE_WIDTH - 8;
         const startFrac = this._getShimmerStartFraction();
-        const sx = startX + startFrac * totalUsableWidth;
-        const scrubberLimitX = startX + totalUsableWidth * this.scrubberPosition;
+        const scrubberLimitX = (this.scrubberPosition !== undefined && this.scrubberPosition < 0.999)
+            ? startX + totalUsableWidth * this.scrubberPosition
+            : this.lineX + this.lineWidth;
         const ex = Math.min(this.lineX + this.lineWidth, scrubberLimitX);
 
         if (ex <= sx) return;

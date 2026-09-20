@@ -671,48 +671,7 @@ export default class PixiScene {
 
     this._scrubberLayer.addChildAt(trackHit, 0);
 
-    // Floating HUD badge above handle
-    const hudContainer = new PIXI.Container();
-    const pct = Math.round(this.scrubberPosition * 100);
-    let previewText = `⏱ t = ${pct}%`;
-    if (this.sliceInfo) {
-      const activeCount = this.sliceInfo.activeBranches?.length || 1;
-      previewText += ` • ${activeCount} ${activeCount === 1 ? 'Branch' : 'Branches'}`;
-      if (this.sliceInfo.hasPhaseInterference) {
-        previewText += ' ⚡Phase';
-      }
-    }
-
-    const hudText = new PIXI.Text({
-      text: previewText,
-      style: {
-        fontFamily: '"Inter", monospace, sans-serif',
-        fontSize: 9,
-        fontWeight: 'bold',
-        fill: this.hasPhaseInterference ? 0x92400e : 0x0369a1,
-      },
-    });
-    hudText.anchor.set(0.5, 0.5);
-
-    const hudW = Math.max(76, hudText.width + 14);
-    const hudH = 17;
-
-    const hudBg = new PIXI.Graphics();
-    hudBg.fill({ color: 0xffffff, alpha: 0.96 });
-    hudBg.setStrokeStyle({ width: 1, color: railColor, alpha: 0.8 });
-    hudBg.roundRect(-hudW / 2, -hudH / 2, hudW, hudH, 8);
-    hudBg.fill();
-    hudBg.stroke();
-
-    hudContainer.addChild(hudBg);
-    hudContainer.addChild(hudText);
-
-    const hudX = Math.max(usableStart + hudW / 2, Math.min(usableStart + usableWidth - hudW / 2, curX));
-    hudContainer.x = hudX;
-    hudContainer.y = trackY - 17;
-
     this._scrubberLayer.addChild(handle);
-    this._scrubberLayer.addChild(hudContainer);
   }
 
   _updateWorldlinesForScrubber() {
