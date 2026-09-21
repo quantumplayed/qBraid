@@ -211,7 +211,7 @@ export class QuantumSimulator {
                 name: q.name,
                 bit: val,
                 status: isBit1 ? 'active' : 'passive',
-                text: isBit1 ? (q.active || 'Positive outcome') : (q.passive || 'Negative outcome'),
+                text: isBit1 ? (q.active || 'Scenario 1') : (q.passive || 'Scenario 2'),
                 rawQubit: q
             };
         });

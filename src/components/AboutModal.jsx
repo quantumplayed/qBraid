@@ -104,7 +104,7 @@ export default function AboutModal({ qubits, connections, simulator, onClose }) 
                                         <h4 className="font-bold text-sm text-slate-900">1. Uncertainty Superposition ($H$ Gate)</h4>
                                     </div>
                                     <p className="text-xs text-slate-600 leading-relaxed">
-                                        Placing an $H$ gate creates a balanced 50/50 superposition between the positive outcome ($|1\rangle$) and negative outcome ($|0\rangle$). Writers can fine-tune probabilities continuously from 0% to 100% using continuous $R_y(\theta)$ bias sliders.
+                                        Placing an $H$ gate creates a balanced 50/50 superposition between Scenario 1 ($|1\rangle$) and Scenario 2 ($|0\rangle$). Writers can fine-tune probabilities continuously from 0% to 100% using continuous $R_y(\theta)$ bias sliders.
                                     </p>
                                 </div>
 
@@ -114,8 +114,8 @@ export default function AboutModal({ qubits, connections, simulator, onClose }) 
                                         <h4 className="font-bold text-sm text-slate-900">2. Bell-Pair Entanglement (CNOT)</h4>
                                     </div>
                                     <p className="text-xs text-slate-600 leading-relaxed">
-                                        <strong>Even Parity ($\Phi^+$)</strong>: Enforces strict co-occurrence. Two beats always occur together (both succeed or both fail: $|00\rangle$ or $|11\rangle$).<br />
-                                        <strong>Odd Parity ($\Psi^+$)</strong>: Enforces mutual exclusion. Two rivals can never both win (zero-sum conflict: $|01\rangle$ or $|10\rangle$).
+                                        <strong>AND ($\Phi^+$)</strong>: Enforces strict co-occurrence. Two beats always share the same branch ($|00\rangle$ or $|11\rangle$).<br />
+                                        <strong>OR ($\Psi^+$)</strong>: Enforces mutual exclusion. Two beats never co-occur ($|01\rangle$ or $|10\rangle$).
                                     </p>
                                 </div>
                             </div>

@@ -99,10 +99,10 @@ The fabric of the multiverse crystallizes into Timeline State |{current_quantum_
         }
         ink += `
 { ${q.varName}:
-    // Positive Outcome (|1>)
+    // Scenario 1 (|1>)
     ${q.active}
 - else:
-    // Negative Outcome (|0>)
+    // Scenario 2 (|0>)
     ${q.passive}
 }
 

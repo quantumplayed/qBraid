@@ -77,8 +77,8 @@ export default function GateSliderOverlay({ x, y, gate, onChange, onClose, onRem
                 {/* Outcome Probabilities Display */}
                 <div className="space-y-1.5 mb-3">
                     <div className="flex justify-between text-xs font-mono">
-                        <span className="text-sky-700 font-semibold">Positive: {activePercent}%</span>
-                        <span className="text-purple-700 font-semibold">Negative: {passivePercent}%</span>
+                        <span className="text-sky-700 font-semibold">Scenario 1: {activePercent}%</span>
+                        <span className="text-purple-700 font-semibold">Scenario 2: {passivePercent}%</span>
                     </div>
 
                     {/* Split Visual Bar */}
@@ -105,9 +105,9 @@ export default function GateSliderOverlay({ x, y, gate, onChange, onClose, onRem
                         className="w-full accent-sky-600 cursor-pointer h-1.5 bg-slate-200 rounded-lg appearance-none"
                     />
                     <div className="flex justify-between text-[10px] text-slate-400 font-mono mt-1">
-                        <span>0% (Passive)</span>
+                        <span>0% (Scenario 2)</span>
                         <span className="text-sky-700 font-medium">50% (H)</span>
-                        <span>100% (Active)</span>
+                        <span>100% (Scenario 1)</span>
                     </div>
                 </div>
 
@@ -133,7 +133,7 @@ export default function GateSliderOverlay({ x, y, gate, onChange, onClose, onRem
                             type="button"
                             onClick={() => setProbability(0.75)}
                             className="px-2 py-1 rounded text-center bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition-all"
-                            title="75% Positive bias"
+                            title="75% Scenario 1 bias"
                         >
                             75 / 25
                         </button>
@@ -141,7 +141,7 @@ export default function GateSliderOverlay({ x, y, gate, onChange, onClose, onRem
                             type="button"
                             onClick={() => setProbability(0.25)}
                             className="px-2 py-1 rounded text-center bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition-all"
-                            title="25% Positive bias"
+                            title="25% Scenario 1 bias"
                         >
                             25 / 75
                         </button>

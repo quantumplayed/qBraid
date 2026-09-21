@@ -135,15 +135,13 @@ export default function TutorialGuide({
   const TUTORIAL_STEPS = [
     {
       step: 1,
-      title: '1. Clean Slate: Two Worldlines',
+      title: '1. The Multiverse Quest Begins',
       badge: 'Getting Started',
       description: (
         <div>
           Welcome to <strong className="text-slate-900">qBraid</strong>! We begin with two clean worldlines representing parallel narrative arcs in a story universe.
           <br /><br />
-          In quantum narrative design, every beat branches into two fundamental paths: a{' '}
-          <span className="font-bold text-sky-600">positive outcome</span> or a{' '}
-          <span className="font-bold text-amber-600">negative outcome</span>.
+          In quantum narrative design, every beat branches into two fundamental paths: <span className="font-bold text-sky-600">Scenario 1</span> or <span className="font-bold text-amber-600">Scenario 2</span>.
           <br /><br />
           Right now, both worldlines are blank. Let's give them life!
         </div>
@@ -161,8 +159,8 @@ export default function TutorialGuide({
           Click the card on the canvas to name your protagonist, or click the Auto-Fill button below:
           <div className="mt-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-200 space-y-1">
             <div className="font-bold text-slate-800">Character: The Hero</div>
-            <div>• <span className="font-bold text-sky-600">positive outcome</span>: "Goes on adventure"</div>
-            <div>• <span className="font-bold text-amber-600">negative outcome</span>: "Stays at home"</div>
+            <div>• <span className="font-bold text-sky-600">Scenario 1</span>: "Goes on adventure"</div>
+            <div>• <span className="font-bold text-amber-600">Scenario 2</span>: "Stays at home"</div>
           </div>
         </div>
       ),
@@ -180,8 +178,8 @@ export default function TutorialGuide({
           Click the card on the canvas or click Auto-Fill to define the opposing force:
           <div className="mt-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-200 space-y-1">
             <div className="font-bold text-slate-800">Character: The Dragon</div>
-            <div>• <span className="font-bold text-sky-600">positive outcome</span>: "Flees across the burning horizon"</div>
-            <div>• <span className="font-bold text-amber-600">negative outcome</span>: "Destroys the defenseless village"</div>
+            <div>• <span className="font-bold text-sky-600">Scenario 1</span>: "Flees across the burning horizon"</div>
+            <div>• <span className="font-bold text-amber-600">Scenario 2</span>: "Destroys the defenseless village"</div>
           </div>
         </div>
       ),
@@ -196,9 +194,7 @@ export default function TutorialGuide({
         <div>
           A predetermined story lacks suspense. In quantum storytelling, we inject suspense using an <strong className="text-slate-900">Uncertainty gate</strong>.
           <br /><br />
-          An Uncertainty gate creates a balanced 50/50 superposition: equal chances of a{' '}
-          <span className="font-bold text-sky-600">positive outcome</span> or a{' '}
-          <span className="font-bold text-amber-600">negative outcome</span>.
+          An Uncertainty gate creates a balanced 50/50 superposition: equal chances of <span className="font-bold text-sky-600">Scenario 1</span> or <span className="font-bold text-amber-600">Scenario 2</span>.
           <br /><br />
           👉 <strong className="text-sky-700">Click the pulsating target beacon on The Hero's line</strong> to place the Uncertainty gate!
           {isStep4Complete && (
@@ -220,10 +216,10 @@ export default function TutorialGuide({
           <br /><br />
           We demand narrative coherence:
           <div className="my-2 text-xs bg-slate-50 p-2 rounded border border-slate-200 space-y-1">
-            <div>• If Hero ventures (<span className="font-bold text-sky-600">positive outcome</span>), Dragon flees (<span className="font-bold text-sky-600">positive outcome</span>).</div>
-            <div>• If Hero stays (<span className="font-bold text-amber-600">negative outcome</span>), Dragon attacks (<span className="font-bold text-amber-600">negative outcome</span>).</div>
+            <div>• If Hero ventures (<span className="font-bold text-sky-600">Scenario 1</span>), Dragon flees (<span className="font-bold text-sky-600">Scenario 1</span>).</div>
+            <div>• If Hero stays (<span className="font-bold text-amber-600">Scenario 2</span>), Dragon attacks (<span className="font-bold text-amber-600">Scenario 2</span>).</div>
           </div>
-          👉 Look at the guided arrow: <strong className="text-indigo-700">Drag from the source point on The Hero down to The Dragon</strong> to link them with an <strong className="text-slate-900">AND</strong> connection!
+          👉 Look at the guided arrow: <strong className="text-amber-700">Drag from the source point on The Hero down to The Dragon</strong> to link them with an <strong className="text-slate-900">AND</strong> connection!
           {isStep5Complete && (
             <div className="mt-2 p-2 bg-emerald-50 text-emerald-800 rounded-lg text-xs font-semibold border border-emerald-200 flex items-center gap-1.5">
               <span>✓</span> Characters entangled with AND! Click "Next" below.
@@ -243,8 +239,8 @@ export default function TutorialGuide({
           <br /><br />
           Instead of 4 disconnected random combinations, the <strong className="text-slate-900">AND</strong> connection has pruned the multiverse down to <strong className="text-sky-700">2 consistent timelines</strong>:
           <div className="my-2 text-xs bg-slate-50 p-2 rounded border border-slate-200 space-y-1">
-            <div><strong>Timeline #0:</strong> Both fall into their <span className="font-bold text-amber-600">negative outcome</span> (50%).</div>
-            <div><strong>Timeline #3:</strong> Both achieve their <span className="font-bold text-sky-600">positive outcome</span> (50%).</div>
+            <div><strong>Timeline #0:</strong> Both resolve into <span className="font-bold text-amber-600">Scenario 2</span> (50%).</div>
+            <div><strong>Timeline #3:</strong> Both achieve <span className="font-bold text-sky-600">Scenario 1</span> (50%).</div>
           </div>
           💡 <em>Tip: For larger stories with many worldlines, the top "Generate Story" modal is also available for a full prose chronicle.</em>
         </div>
@@ -285,7 +281,7 @@ export default function TutorialGuide({
           <br />
           👉 <strong>Step 2:</strong> Click the connection's badge to toggle it from <strong className="text-slate-800">AND</strong> to <strong className="text-amber-700">OR</strong>.
           <br /><br />
-          An <strong className="text-slate-900">OR</strong> connection guarantees that when The Hero achieves a <span className="font-bold text-sky-600">positive outcome</span>, the Sword is in its <span className="font-bold text-amber-600">negative outcome</span>, creating meaningful dramatic trade-offs!
+          An <strong className="text-slate-900">OR</strong> connection guarantees that when The Hero achieves <span className="font-bold text-sky-600">Scenario 1</span>, the Sword is in <span className="font-bold text-amber-600">Scenario 2</span>, creating meaningful dramatic trade-offs!
           {isStep8Complete && (
             <div className="mt-2 p-2 bg-emerald-50 text-emerald-800 rounded-lg text-xs font-semibold border border-emerald-200 flex items-center gap-1.5">
               <span>✓</span> OR connection set! Click "Next" below.
@@ -305,7 +301,7 @@ export default function TutorialGuide({
           <br /><br />
           Now look at the <strong className="text-slate-900">Timeline Scrubber</strong> at the very bottom of the canvas:
           <br />
-          Dragging the scrubber from <strong className="text-slate-800">t=0 (Genesis)</strong> to <strong className="text-slate-800">t=1 (Destiny)</strong> travels through narrative time. Notice how gates and connections take effect chronologically as the vertical laser line crosses them!
+          Dragging the scrubber from <strong className="text-slate-800">Start</strong> to <strong className="text-slate-800">End</strong> travels through narrative time. Notice how gates and connections take effect chronologically as the vertical laser line crosses them!
           <br /><br />
           🎉 <strong>Congratulations!</strong> You have mastered quantum narrative entangling.
         </div>

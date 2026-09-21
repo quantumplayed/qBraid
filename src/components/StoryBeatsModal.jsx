@@ -45,8 +45,8 @@ export default function StoryBeatsModal({
         const num = qubits.length + 1;
         onAddBeat({
             name: `Story Beat ${num}`,
-            active: `Positive event for Beat ${num}`,
-            passive: `Negative event for Beat ${num}`
+            active: `Scenario 1 for Beat ${num}`,
+            passive: `Scenario 2 for Beat ${num}`
         });
     };
 
@@ -189,12 +189,12 @@ export default function StoryBeatsModal({
                                     <div className="flex items-center justify-between">
                                         <label className="text-sky-900 text-sm font-semibold flex items-center gap-1.5">
                                             <span className="w-2 h-2 rounded-full bg-sky-500" />
-                                            Active / Positive Outcome (State |1⟩)
+                                            Scenario 1 (State |1⟩)
                                         </label>
-                                        <span className="text-[10px] font-mono text-sky-700">Triggered on Active Bit</span>
+                                        <span className="text-[10px] font-mono text-sky-700">Active Branch</span>
                                     </div>
                                     <p className="text-xs text-slate-500">
-                                        What happens when this event succeeds, this character acts, or this timeline branch resolves positively:
+                                        What happens when this character or story beat resolves into Scenario 1:
                                     </p>
                                     <textarea
                                         rows={3}
@@ -209,12 +209,12 @@ export default function StoryBeatsModal({
                                     <div className="flex items-center justify-between">
                                         <label className="text-purple-900 text-sm font-semibold flex items-center gap-1.5">
                                             <span className="w-2 h-2 rounded-full bg-purple-500" />
-                                            Passive / Negative Outcome (State |0⟩)
+                                            Scenario 2 (State |0⟩)
                                         </label>
-                                        <span className="text-[10px] font-mono text-purple-700">Triggered on Default Bit</span>
+                                        <span className="text-[10px] font-mono text-purple-700">Default Branch</span>
                                     </div>
                                     <p className="text-xs text-slate-500">
-                                        What happens when this event fails, remains dormant, or resolves negatively:
+                                        What happens when this character or story beat resolves into Scenario 2:
                                     </p>
                                     <textarea
                                         rows={3}

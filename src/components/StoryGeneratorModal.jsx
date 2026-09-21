@@ -46,7 +46,7 @@ export default function StoryGeneratorModal({
                     );
                     return {
                         ...beat,
-                        title: beat.status === 'active' ? 'POSITIVE OUTCOME' : 'NEGATIVE OUTCOME',
+                        title: beat.status === 'active' ? 'SCENARIO 1' : 'SCENARIO 2',
                         connections: relevantConns
                     };
                 });
@@ -73,8 +73,8 @@ export default function StoryGeneratorModal({
                         name: q.name,
                         bit: isBit1 ? 1 : 0,
                         status: isBit1 ? 'active' : 'passive',
-                        title: isBit1 ? 'POSITIVE OUTCOME' : 'NEGATIVE OUTCOME',
-                        text: isBit1 ? (q.active || 'Succeeds') : (q.passive || 'Fails'),
+                        title: isBit1 ? 'SCENARIO 1' : 'SCENARIO 2',
+                        text: isBit1 ? (q.active || 'Scenario 1') : (q.passive || 'Scenario 2'),
                         connections: relevantConns
                     };
                 });
@@ -245,7 +245,7 @@ export default function StoryGeneratorModal({
                                             Timeline Story Beats ({sampledState.beatOutcomes.length})
                                         </span>
                                         <span className="text-[11px] font-mono text-slate-400">
-                                            Blue = Active/Positive · Purple = Passive/Negative
+                                            Blue = Scenario 1 · Purple = Scenario 2
                                         </span>
                                     </div>
 
@@ -278,7 +278,7 @@ export default function StoryGeneratorModal({
                                                                     : 'bg-purple-100 text-purple-800 border border-purple-300'
                                                             }`}
                                                         >
-                                                            {isActive ? 'POSITIVE (1)' : 'NEGATIVE (0)'}
+                                                            {isActive ? 'SCENARIO 1' : 'SCENARIO 2'}
                                                         </span>
                                                     </div>
 

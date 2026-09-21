@@ -42,27 +42,27 @@ export default function NarrativeModal({ qubit, onClose, onSave, onRemove }) {
 
           <div className="p-3.5 rounded-xl bg-sky-50/60 border border-sky-200/70">
             <label className="block text-sky-800 text-xs font-mono uppercase tracking-wider mb-1 font-semibold">
-              Active / Positive Outcome (|1⟩)
+              Scenario 1 (|1⟩)
             </label>
             <input
               type="text"
               value={active}
               onChange={(e) => setActive(e.target.value)}
               className="w-full bg-white border border-sky-200 focus:border-sky-500 text-slate-900 px-3 py-2 rounded-lg text-sm transition-all shadow-sm"
-              placeholder="What happens if positive..."
+              placeholder="What happens in Scenario 1..."
             />
           </div>
 
           <div className="p-3.5 rounded-xl bg-purple-50/60 border border-purple-200/70">
             <label className="block text-purple-800 text-xs font-mono uppercase tracking-wider mb-1 font-semibold">
-              Passive / Negative Outcome (|0⟩)
+              Scenario 2 (|0⟩)
             </label>
             <input
               type="text"
               value={passive}
               onChange={(e) => setPassive(e.target.value)}
               className="w-full bg-white border border-purple-200 focus:border-purple-500 text-slate-900 px-3 py-2 rounded-lg text-sm transition-all shadow-sm"
-              placeholder="What happens if negative..."
+              placeholder="What happens in Scenario 2..."
             />
           </div>
         </div>

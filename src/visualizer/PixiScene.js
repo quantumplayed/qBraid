@@ -597,12 +597,12 @@ export default class PixiScene {
 
     // Labels at 0% and 100%
     const label0 = new PIXI.Text({
-      text: 't=0 (Genesis)',
+      text: 'Start',
       style: {
         fontFamily: '"Inter", system-ui, sans-serif',
-        fontSize: 8.5,
+        fontSize: 9,
         fill: 0x94a3b8,
-        fontWeight: '500',
+        fontWeight: '600',
       },
     });
     label0.anchor.set(0, 0.5);
@@ -611,12 +611,12 @@ export default class PixiScene {
     this._scrubberLayer.addChild(label0);
 
     const label1 = new PIXI.Text({
-      text: 't=1 (Destiny)',
+      text: 'End',
       style: {
         fontFamily: '"Inter", system-ui, sans-serif',
-        fontSize: 8.5,
+        fontSize: 9,
         fill: 0x94a3b8,
-        fontWeight: '500',
+        fontWeight: '600',
       },
     });
     label1.anchor.set(1, 0.5);

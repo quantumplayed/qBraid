@@ -287,8 +287,8 @@ export default function App() {
       return [...prev, {
         id: `q${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
         name: customData?.name || (isTutorialSword ? 'The Magic Sword' : `Character ${num}`),
-        active: customData?.active || (isTutorialSword ? 'Hero draws the radiant Sunblade' : `Positive outcome for Character ${num}`),
-        passive: customData?.passive || (isTutorialSword ? 'Blade remains trapped in stone' : `Negative outcome for Character ${num}`),
+        active: customData?.active || (isTutorialSword ? 'Hero draws the radiant Sunblade' : `Scenario 1 for Character ${num}`),
+        passive: customData?.passive || (isTutorialSword ? 'Blade remains trapped in stone' : `Scenario 2 for Character ${num}`),
         gates: [],
       }];
     });
