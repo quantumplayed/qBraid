@@ -273,6 +273,78 @@ export class QuantumSimulator {
     }
 
     /**
+     * Computes the chronological intervals [start, end] where each qubit is uncertain.
+     * Before any entangling or superposition event, or if a qubit is deterministic,
+     * it will not be in an uncertain segment.
+     * @param {Array} allEvents Chronological list of circuit events
+     * @param {number} activeCount
+     * @returns {Record<number, Array<{start: number, end: number}>>}
+     */
+    computeUncertaintySegments(allEvents = [], activeCount = this.numQubits) {
+        const sorted = [...allEvents].sort((a, b) => a.position - b.position);
+
+        // Collect distinct event positions strictly between 0 and 1
+        const eventPositions = [];
+        for (const e of sorted) {
+            const p = Math.max(0.001, Math.min(0.999, e.position));
+            if (!eventPositions.some(existing => Math.abs(existing - p) < 0.002)) {
+                eventPositions.push(p);
+            }
+        }
+        eventPositions.sort((a, b) => a - b);
+
+        const milestones = [0, ...eventPositions, 1.0];
+        const rawSegments = {};
+        for (let qi = 0; qi < activeCount; qi++) {
+            rawSegments[qi] = [];
+        }
+
+        for (let i = 0; i < milestones.length - 1; i++) {
+            const segStart = milestones[i];
+            const segEnd = milestones[i + 1];
+            if (segEnd <= segStart + 0.001) continue;
+
+            this.reset();
+            const eventsUpToStart = sorted.filter(e => e.position <= segStart + 0.001);
+            for (const evt of eventsUpToStart) {
+                this.applyGate(evt.type, evt.target, evt.control ?? null, evt.params || {});
+            }
+
+            for (let qi = 0; qi < activeCount; qi++) {
+                const probs = this.getEntityProbabilities(qi);
+                const prob1 = probs[1] || 0;
+                const isUncertain = prob1 > 0.001 && prob1 < 0.999;
+                if (isUncertain) {
+                    rawSegments[qi].push({ start: segStart, end: segEnd });
+                }
+            }
+        }
+
+        // Merge contiguous segments for each qubit
+        const merged = {};
+        for (let qi = 0; qi < activeCount; qi++) {
+            const list = rawSegments[qi];
+            if (list.length === 0) {
+                merged[qi] = [];
+                continue;
+            }
+            const out = [{ start: list[0].start, end: list[0].end }];
+            for (let j = 1; j < list.length; j++) {
+                const prev = out[out.length - 1];
+                const curr = list[j];
+                if (Math.abs(prev.end - curr.start) < 0.003) {
+                    prev.end = curr.end;
+                } else {
+                    out.push({ start: curr.start, end: curr.end });
+                }
+            }
+            merged[qi] = out;
+        }
+
+        return merged;
+    }
+
+    /**
      * Evaluates circuit up to a given time slice position (0.0 to 1.0).
      */
     getSliceState(allEvents = [], position = 1.0, activeCount = this.numQubits) {
@@ -290,13 +362,16 @@ export class QuantumSimulator {
             marginals[qi] = this.getEntityProbabilities(qi);
         }
 
+        const uncertainSegments = this.computeUncertaintySegments(allEvents, activeCount);
+
         return {
             ...detailed,
             position,
             appliedEvents,
             appliedEventCount: appliedEvents.length,
             totalEventCount: sorted.length,
-            marginals
+            marginals,
+            uncertainSegments
         };
     }
 }

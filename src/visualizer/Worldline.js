@@ -25,6 +25,7 @@ export default class Worldline extends PIXI.Container {
         isUncertain = false,
         hasPhaseInterference = false,
         scrubberPosition = 1.0,
+        uncertainSegments = [],
     }) {
         super();
 
@@ -37,6 +38,7 @@ export default class Worldline extends PIXI.Container {
         this.isUncertain = isUncertain;
         this.hasPhaseInterference = hasPhaseInterference || false;
         this.scrubberPosition = scrubberPosition ?? 1.0;
+        this.uncertainSegments = uncertainSegments || [];
 
         // Node pill width offset: line starts after the start node pill
         this.START_NODE_WIDTH = 130;
@@ -88,6 +90,59 @@ export default class Worldline extends PIXI.Container {
         this._drawStaticLine();
     }
 
+    _getClampedUncertainIntervals() {
+        const limitFrac = (this.scrubberPosition !== undefined && this.scrubberPosition < 0.999)
+            ? this.scrubberPosition
+            : 1.0;
+
+        let raw = this.uncertainSegments;
+        if (!raw || raw.length === 0) {
+            // Fallback if segments not computed but isUncertain is true
+            if (this.isUncertain) {
+                const startFrac = this.gates.length > 0
+                    ? Math.min(...this.gates.map(g => g.position))
+                    : 0;
+                raw = [{ start: startFrac, end: 1.0 }];
+            } else {
+                return [];
+            }
+        }
+
+        const clamped = [];
+        for (const seg of raw) {
+            const s = Math.max(0, seg.start);
+            const e = Math.min(limitFrac, seg.end);
+            if (e > s + 0.001) {
+                clamped.push({ start: s, end: e });
+            }
+        }
+        return clamped;
+    }
+
+    _getDeterministicIntervals() {
+        const limitFrac = (this.scrubberPosition !== undefined && this.scrubberPosition < 0.999)
+            ? this.scrubberPosition
+            : 1.0;
+
+        const uList = this._getClampedUncertainIntervals();
+        if (uList.length === 0) {
+            return limitFrac > 0.001 ? [{ start: 0, end: limitFrac }] : [];
+        }
+
+        const det = [];
+        let curr = 0;
+        for (const u of uList) {
+            if (u.start > curr + 0.001) {
+                det.push({ start: curr, end: u.start });
+            }
+            curr = Math.max(curr, u.end);
+        }
+        if (limitFrac > curr + 0.001) {
+            det.push({ start: curr, end: limitFrac });
+        }
+        return det;
+    }
+
     _drawStaticLine() {
         const g = this.staticLine;
         g.clear();
@@ -95,51 +150,39 @@ export default class Worldline extends PIXI.Container {
         const startX = this.lineX + this.START_NODE_WIDTH + 8;
         const totalUsableWidth = this.lineWidth - this.START_NODE_WIDTH - 8;
 
-        const scrubberLimitX = (this.scrubberPosition !== undefined && this.scrubberPosition < 0.999)
-            ? startX + totalUsableWidth * this.scrubberPosition
-            : this.lineX + this.lineWidth;
-
         const glowColor = this.hasPhaseInterference ? 0xfde68a : 0x38bdf8;
         const coreColor = this.hasPhaseInterference ? 0xd97706 : 0x0284c7;
 
-        if (this._shouldShimmer()) {
-            const startFrac = this._getShimmerStartFraction();
-            const sx = startX + startFrac * totalUsableWidth;
-            const detEndX = Math.min(sx, scrubberLimitX);
+        const detIntervals = this._getDeterministicIntervals();
+        const uncIntervals = this._getClampedUncertainIntervals();
 
-            // Deterministic portion before superposition (solid opacity)
-            if (detEndX > startX) {
-                g.setStrokeStyle({ width: 5, color: glowColor, alpha: 0.28 });
-                g.moveTo(startX, this.lineY);
-                g.lineTo(detEndX, this.lineY);
-                g.stroke();
+        // 1. Draw solid deterministic portions (full opacity glow + core line)
+        for (const intv of detIntervals) {
+            const x1 = startX + intv.start * totalUsableWidth;
+            const x2 = startX + intv.end * totalUsableWidth;
+            if (x2 <= x1 + 0.5) continue;
 
-                g.setStrokeStyle({ width: 2.5, color: coreColor, alpha: 1 });
-                g.moveTo(startX, this.lineY);
-                g.lineTo(detEndX, this.lineY);
-                g.stroke();
-            }
+            g.setStrokeStyle({ width: 5, color: glowColor, alpha: 0.28 });
+            g.moveTo(x1, this.lineY);
+            g.lineTo(x2, this.lineY);
+            g.stroke();
 
-            // Visible baseline guide underneath superposition wave (never transparent)
-            if (scrubberLimitX > detEndX) {
-                g.setStrokeStyle({ width: 2, color: coreColor, alpha: 0.35 });
-                g.moveTo(detEndX, this.lineY);
-                g.lineTo(scrubberLimitX, this.lineY);
-                g.stroke();
-            }
-        } else {
-            // Entirely deterministic line up to scrubberLimitX
-            if (scrubberLimitX > startX) {
-                g.setStrokeStyle({ width: 5, color: glowColor, alpha: 0.28 });
-                g.moveTo(startX, this.lineY);
-                g.lineTo(scrubberLimitX, this.lineY);
-                g.stroke();
+            g.setStrokeStyle({ width: 2.5, color: coreColor, alpha: 1 });
+            g.moveTo(x1, this.lineY);
+            g.lineTo(x2, this.lineY);
+            g.stroke();
+        }
 
-                g.setStrokeStyle({ width: 2.5, color: coreColor, alpha: 1 });
-                g.moveTo(startX, this.lineY);
-                g.lineTo(scrubberLimitX, this.lineY);
-                g.stroke();
-            }
+        // 2. Draw subtle baseline rail underneath superposition wave portions
+        for (const intv of uncIntervals) {
+            const x1 = startX + intv.start * totalUsableWidth;
+            const x2 = startX + intv.end * totalUsableWidth;
+            if (x2 <= x1 + 0.5) continue;
+
+            g.setStrokeStyle({ width: 2, color: coreColor, alpha: 0.35 });
+            g.moveTo(x1, this.lineY);
+            g.lineTo(x2, this.lineY);
+            g.stroke();
         }
     }
 
@@ -567,7 +610,7 @@ export default class Worldline extends PIXI.Container {
         }
     }
 
-    updateData({ name, gates, isUncertain, hasPhaseInterference, scrubberPosition }) {
+    updateData({ name, gates, isUncertain, hasPhaseInterference, scrubberPosition, uncertainSegments }) {
         if (name !== undefined && name !== this.qubitName) {
             this.qubitName = name;
             if (this.cardLabel) this.cardLabel.text = name;
@@ -589,6 +632,10 @@ export default class Worldline extends PIXI.Container {
             this.scrubberPosition = scrubberPosition;
             needsRedraw = true;
         }
+        if (uncertainSegments !== undefined) {
+            this.uncertainSegments = uncertainSegments;
+            needsRedraw = true;
+        }
         if (needsRedraw) {
             this._drawStaticLine();
             this._drawGateDiamonds();
@@ -596,7 +643,8 @@ export default class Worldline extends PIXI.Container {
     }
 
     tick(dt) {
-        this._time += dt * 0.05;
+        // Slow, elegant quantum wave speed (reduced by ~3.5x from 0.05)
+        this._time += dt * 0.015;
         this._updateShimmer();
         this._updateHoverDot();
     }
@@ -605,56 +653,55 @@ export default class Worldline extends PIXI.Container {
         const g = this.shimmerLine;
         g.clear();
 
-        if (!this._shouldShimmer()) return;
+        const uncIntervals = this._getClampedUncertainIntervals();
+        if (uncIntervals.length === 0) return;
 
         const startX = this.lineX + this.START_NODE_WIDTH + 8;
         const totalUsableWidth = this.lineWidth - this.START_NODE_WIDTH - 8;
-        const startFrac = this._getShimmerStartFraction();
-        const sx = startX + startFrac * totalUsableWidth;
-        const scrubberLimitX = (this.scrubberPosition !== undefined && this.scrubberPosition < 0.999)
-            ? startX + totalUsableWidth * this.scrubberPosition
-            : this.lineX + this.lineWidth;
-        const ex = Math.min(this.lineX + this.lineWidth, scrubberLimitX);
-
-        if (ex <= sx + 2) return;
 
         const step = 4;
         const glowColor = this.hasPhaseInterference ? 0xf59e0b : 0x38bdf8;
         const coreColor = this.hasPhaseInterference ? 0xd97706 : 0x0284c7;
         const rippleColor = this.hasPhaseInterference ? 0xec4899 : 0x6366f1;
 
-        // 1. Soft glowing outer superposition wave
-        const glowPulse = 0.35 + 0.15 * Math.sin(this._time * 4);
-        g.setStrokeStyle({ width: 5.5, color: glowColor, alpha: glowPulse });
-        g.moveTo(sx, this.lineY + Math.sin(this._time * 5 + sx * 0.045) * 3.5);
-        for (let px = sx + step; px < ex; px += step) {
-            const y = this.lineY + Math.sin(this._time * 5 + px * 0.045) * 3.5;
-            g.lineTo(px, y);
-        }
-        g.lineTo(ex, this.lineY + Math.sin(this._time * 5 + ex * 0.045) * 3.5);
-        g.stroke();
+        for (const intv of uncIntervals) {
+            const sx = startX + intv.start * totalUsableWidth;
+            const ex = startX + intv.end * totalUsableWidth;
+            if (ex <= sx + 2) continue;
 
-        // 2. High-contrast core wave (richly visible and dynamic)
-        const coreAlpha = 0.85 + 0.12 * Math.sin(this._time * 3 + 1);
-        g.setStrokeStyle({ width: 2.8, color: coreColor, alpha: Math.min(1.0, coreAlpha) });
-        g.moveTo(sx, this.lineY + Math.sin(this._time * 5 + sx * 0.045) * 3.5);
-        for (let px = sx + step; px < ex; px += step) {
-            const y = this.lineY + Math.sin(this._time * 5 + px * 0.045) * 3.5;
-            g.lineTo(px, y);
-        }
-        g.lineTo(ex, this.lineY + Math.sin(this._time * 5 + ex * 0.045) * 3.5);
-        g.stroke();
+            // 1. Soft glowing outer superposition wave (smooth, wide crests)
+            const glowPulse = 0.35 + 0.15 * Math.sin(this._time * 1.5);
+            g.setStrokeStyle({ width: 5.5, color: glowColor, alpha: glowPulse });
+            g.moveTo(sx, this.lineY + Math.sin(this._time * 1.8 + sx * 0.032) * 3.0);
+            for (let px = sx + step; px < ex; px += step) {
+                const y = this.lineY + Math.sin(this._time * 1.8 + px * 0.032) * 3.0;
+                g.lineTo(px, y);
+            }
+            g.lineTo(ex, this.lineY + Math.sin(this._time * 1.8 + ex * 0.032) * 3.0);
+            g.stroke();
 
-        // 3. Counter-phase harmonic ripple (quantum interference look)
-        const rippleAlpha = 0.75 + 0.2 * Math.cos(this._time * 3.5);
-        g.setStrokeStyle({ width: 1.8, color: rippleColor, alpha: Math.min(0.95, rippleAlpha) });
-        g.moveTo(sx, this.lineY - Math.sin(this._time * 3.8 + sx * 0.035) * 2.5);
-        for (let px = sx + step; px < ex; px += step) {
-            const y = this.lineY - Math.sin(this._time * 3.8 + px * 0.035) * 2.5;
-            g.lineTo(px, y);
+            // 2. High-contrast core wave (richly visible, calm flow)
+            const coreAlpha = 0.85 + 0.12 * Math.sin(this._time * 1.2 + 1);
+            g.setStrokeStyle({ width: 2.8, color: coreColor, alpha: Math.min(1.0, coreAlpha) });
+            g.moveTo(sx, this.lineY + Math.sin(this._time * 1.8 + sx * 0.032) * 3.0);
+            for (let px = sx + step; px < ex; px += step) {
+                const y = this.lineY + Math.sin(this._time * 1.8 + px * 0.032) * 3.0;
+                g.lineTo(px, y);
+            }
+            g.lineTo(ex, this.lineY + Math.sin(this._time * 1.8 + ex * 0.032) * 3.0);
+            g.stroke();
+
+            // 3. Counter-phase harmonic ripple (quantum interference look)
+            const rippleAlpha = 0.7 + 0.2 * Math.cos(this._time * 1.4);
+            g.setStrokeStyle({ width: 1.8, color: rippleColor, alpha: Math.min(0.95, rippleAlpha) });
+            g.moveTo(sx, this.lineY - Math.sin(this._time * 1.4 + sx * 0.025) * 2.0);
+            for (let px = sx + step; px < ex; px += step) {
+                const y = this.lineY - Math.sin(this._time * 1.4 + px * 0.025) * 2.0;
+                g.lineTo(px, y);
+            }
+            g.lineTo(ex, this.lineY - Math.sin(this._time * 1.4 + ex * 0.025) * 2.0);
+            g.stroke();
         }
-        g.lineTo(ex, this.lineY - Math.sin(this._time * 3.8 + ex * 0.035) * 2.5);
-        g.stroke();
     }
 
     _updateHoverDot() {

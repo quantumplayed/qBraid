@@ -232,6 +232,7 @@ export default class PixiScene {
         isUncertain,
         hasPhaseInterference: this.hasPhaseInterference,
         scrubberPosition: this.scrubberPosition,
+        uncertainSegments: this.sliceInfo?.uncertainSegments?.[i] || [],
       });
 
       // Event listeners
@@ -693,6 +694,7 @@ export default class PixiScene {
         wl.updateData({
           hasPhaseInterference: this.hasPhaseInterference,
           scrubberPosition: this.scrubberPosition,
+          uncertainSegments: this.sliceInfo?.uncertainSegments?.[i] || [],
         });
       }
     }
@@ -1082,39 +1084,52 @@ export default class PixiScene {
       const ey = wl1.lineY;
       const g = new PIXI.Graphics();
 
-      // Source beacon
-      g.fill({ color: 0x6366f1, alpha: 0.85 });
+      // High-contrast Amber/Gold theme (stands out from the user's purple drag thread)
+      const guideColor = 0xd97706;
+      const guideGlow = 0xf59e0b;
+      const guideLight = 0xfef3c7;
+
+      // Source beacon on Line 1
+      g.fill({ color: guideColor, alpha: 0.95 });
       g.circle(sx, sy, 7);
       g.fill();
-      g.setStrokeStyle({ width: 2, color: 0x818cf8, alpha: 0.7 + 0.3 * pulse });
-      g.circle(sx, sy, 12 + 4 * pulse);
+      g.setStrokeStyle({ width: 2.5, color: guideGlow, alpha: 0.7 + 0.3 * pulse });
+      g.circle(sx, sy, 13 + 4 * pulse);
       g.stroke();
 
-      // Target beacon
-      g.setStrokeStyle({ width: 2, color: 0x6366f1, alpha: 0.8 });
-      g.circle(sx, ey, 9);
+      // Target beacon on Line 2
+      g.setStrokeStyle({ width: 2.5, color: guideColor, alpha: 0.9 });
+      g.circle(sx, ey, 10);
       g.stroke();
-      g.fill({ color: 0x6366f1, alpha: 0.25 });
-      g.circle(sx, ey, 9);
+      g.fill({ color: guideGlow, alpha: 0.35 });
+      g.circle(sx, ey, 10);
       g.fill();
 
-      // Animated line from source to target
-      const arrowProgress = (this._tutorialTime * 2) % 1;
-      const currY = sy + (ey - sy) * arrowProgress;
-      g.setStrokeStyle({ width: 2.5, color: 0x6366f1, alpha: 0.6 });
+      // Vertical guide track
+      g.setStrokeStyle({ width: 2.5, color: guideGlow, alpha: 0.6 });
       g.moveTo(sx, sy);
       g.lineTo(sx, ey);
       g.stroke();
 
-      // Moving tracer dot
-      g.fill({ color: 0xa855f7, alpha: 0.95 });
-      g.circle(sx, currY, 5);
-      g.fill();
+      // Slower, smooth glide animation (~1.6s per cycle instead of rapid strobe)
+      const arrowProgress = (this._tutorialTime * 0.3) % 1;
+      const currY = sy + (ey - sy) * arrowProgress;
 
-      // Annotation text
+      // Moving golden comet tracer with glow
+      g.fill({ color: guideGlow, alpha: 0.4 });
+      g.circle(sx, currY, 9);
+      g.fill();
+      g.fill({ color: 0xb45309, alpha: 0.95 });
+      g.circle(sx, currY, 5.5);
+      g.fill();
+      g.setStrokeStyle({ width: 1.5, color: guideLight, alpha: 0.95 });
+      g.circle(sx, currY, 5.5);
+      g.stroke();
+
+      // Annotation label
       const label = new PIXI.Text({
         text: '⬇ Drag from here to here',
-        style: { fontFamily: '"Inter", system-ui, sans-serif', fontSize: 11, fontWeight: 'bold', fill: 0x4f46e5 }
+        style: { fontFamily: '"Inter", system-ui, sans-serif', fontSize: 11, fontWeight: 'bold', fill: 0x92400e }
       });
       label.x = sx + 16;
       label.y = (sy + ey) / 2;
@@ -1167,25 +1182,45 @@ export default class PixiScene {
         const sy = wl0.lineY;
         const ey = wl2.lineY;
 
-        g.fill({ color: 0x6366f1, alpha: 0.85 });
+        const guideColor = 0xd97706;
+        const guideGlow = 0xf59e0b;
+        const guideLight = 0xfef3c7;
+
+        g.fill({ color: guideColor, alpha: 0.95 });
         g.circle(sx, sy, 7);
         g.fill();
-        g.setStrokeStyle({ width: 2, color: 0x818cf8, alpha: 0.7 + 0.3 * pulse });
-        g.circle(sx, sy, 12 + 4 * pulse);
+        g.setStrokeStyle({ width: 2.5, color: guideGlow, alpha: 0.7 + 0.3 * pulse });
+        g.circle(sx, sy, 13 + 4 * pulse);
         g.stroke();
 
-        g.setStrokeStyle({ width: 2, color: 0x6366f1, alpha: 0.8 });
-        g.circle(sx, ey, 9);
+        g.setStrokeStyle({ width: 2.5, color: guideColor, alpha: 0.9 });
+        g.circle(sx, ey, 10);
         g.stroke();
+        g.fill({ color: guideGlow, alpha: 0.35 });
+        g.circle(sx, ey, 10);
+        g.fill();
 
-        g.setStrokeStyle({ width: 2.5, color: 0x6366f1, alpha: 0.6 });
+        g.setStrokeStyle({ width: 2.5, color: guideGlow, alpha: 0.6 });
         g.moveTo(sx, sy);
         g.lineTo(sx, ey);
         g.stroke();
 
+        const arrowProgress = (this._tutorialTime * 0.3) % 1;
+        const currY = sy + (ey - sy) * arrowProgress;
+
+        g.fill({ color: guideGlow, alpha: 0.4 });
+        g.circle(sx, currY, 9);
+        g.fill();
+        g.fill({ color: 0xb45309, alpha: 0.95 });
+        g.circle(sx, currY, 5.5);
+        g.fill();
+        g.setStrokeStyle({ width: 1.5, color: guideLight, alpha: 0.95 });
+        g.circle(sx, currY, 5.5);
+        g.stroke();
+
         const label = new PIXI.Text({
           text: '⬇ Drag to connect to Worldline 3',
-          style: { fontFamily: '"Inter", system-ui, sans-serif', fontSize: 11, fontWeight: 'bold', fill: 0x4f46e5 }
+          style: { fontFamily: '"Inter", system-ui, sans-serif', fontSize: 11, fontWeight: 'bold', fill: 0x92400e }
         });
         label.x = sx + 16;
         label.y = (sy + ey) / 2;
@@ -1310,6 +1345,7 @@ export default class PixiScene {
             name: qubits[i].name,
             gates: qubits[i].gates || [],
             isUncertain: this.qubitUncertainty[qubits[i].id] ?? false,
+            uncertainSegments: this.sliceInfo?.uncertainSegments?.[i] || [],
           });
         }
       }
@@ -1337,6 +1373,7 @@ export default class PixiScene {
       if (q && this.worldlines[i]) {
         this.worldlines[i].updateData({
           isUncertain: uncertainty[q.id] ?? false,
+          uncertainSegments: this.sliceInfo?.uncertainSegments?.[i] || [],
         });
       }
     }
