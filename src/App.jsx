@@ -12,9 +12,17 @@ import QuantumBackendModal from './components/QuantumBackendModal';
 import SaveLoadModal from './components/SaveLoadModal';
 import UnsavedChangesPrompt from './components/UnsavedChangesPrompt';
 import TutorialGuide from './components/TutorialGuide';
+import ConnectionModal from './components/ConnectionModal';
 import { downloadInkFile } from './utils/inkExporter';
 import { downloadProjectFile } from './utils/projectStorage';
 import { useEffect } from 'react';
+
+export function getControls(conn) {
+  if (Array.isArray(conn?.controls)) return conn.controls;
+  if (Array.isArray(conn?.control)) return conn.control;
+  if (conn?.control !== undefined && conn?.control !== null) return [conn.control];
+  return [];
+}
 
 const MAX_WORLDLINES = 10;
 
@@ -55,27 +63,88 @@ const DEFAULT_PRESETS = {
     ]
   },
   epic_10: {
-    name: '🌌 10-Qubit Deep Multiverse (1024 Stories)',
-    description: 'Full 10-beat narrative branching space with complex interconnected causal lines.',
+    name: '🌌 Project Event Horizon (10-Qubit Sci-Fi Multiverse)',
+    description: 'Deep hard sci-fi causal net: The Chronos Deep Expedition at the event horizon of a Kerr Singularity.',
     qubits: [
-      { id: 'q0', name: 'The Oracle', active: 'Reveals the cosmic prophecy', passive: 'Keeps the omen hidden', gates: [{ id: 'g0', type: 'Ry', theta: Math.PI / 2, position: 0.15 }] },
-      { id: 'q1', name: 'The Captain', active: 'Rallies the vanguard fleet', passive: 'Orders defensive retreat', gates: [] },
-      { id: 'q2', name: 'The Smuggler', active: 'Delivers the hyper-core', passive: 'Sells the cargo elsewhere', gates: [{ id: 'g2', type: 'Ry', theta: Math.PI / 2, position: 0.2 }] },
-      { id: 'q3', name: 'The Diplomat', active: 'Signs the interplanetary treaty', passive: 'Declares martial law', gates: [] },
-      { id: 'q4', name: 'The Engineer', active: 'Overclocks the warp shield', passive: 'Ejects the power cell', gates: [] },
-      { id: 'q5', name: 'The Shadow Agent', active: 'Assassinates the traitor', passive: 'Discovers false intelligence', gates: [] },
-      { id: 'q6', name: 'The AI Sentinel', active: 'Overrides colony defense', passive: 'Remains subservient', gates: [] },
-      { id: 'q7', name: 'The Rebel Leader', active: 'Ignites the planetary uprising', passive: 'Advises patience', gates: [] },
-      { id: 'q8', name: 'The Archon', active: 'Unleashes the dark sun weapon', passive: 'Sues for truce', gates: [] },
-      { id: 'q9', name: 'The Chronicler', active: 'Preserves the heroic epoch', passive: 'Witnesses civilization collapse', gates: [] },
+      {
+        id: 'q0',
+        name: 'A.E.G.I.S. (Quantum AI)',
+        active: 'Initiates relativistic warp jump through the event horizon',
+        passive: 'Executes core safety lockdown to preserve orbital containment',
+        gates: [{ id: 'g0', type: 'Ry', theta: Math.PI / 2, position: 0.12 }]
+      },
+      {
+        id: 'q1',
+        name: 'Admiral Vance (Fleet)',
+        active: 'Fires dark-matter cascade beam into the anomaly',
+        passive: 'Transmits unconditional surrender frequencies to the swarm',
+        gates: []
+      },
+      {
+        id: 'q2',
+        name: 'Dr. Thorne (Xenobiologist)',
+        active: 'Injects synthetic retrovirus into the alien progenitor core',
+        passive: 'Incinerates research biosphere to halt contagion',
+        gates: [{ id: 'g2', type: 'Ry', theta: Math.PI / 2, position: 0.22 }]
+      },
+      {
+        id: 'q3',
+        name: 'Envoy Orlov (Coalition)',
+        active: 'Ratifies the Interplanetary Partition Treaty under duress',
+        passive: 'Detonates diplomatic dreadnought in high orbit',
+        gates: []
+      },
+      {
+        id: 'q4',
+        name: 'Chief Engineer Kaelen',
+        active: 'Overclocks antimatter containment magnetic field to 150%',
+        passive: 'Jettisons primary warp manifold into deep space',
+        gates: []
+      },
+      {
+        id: 'q5',
+        name: 'Operative Nyx (Black Ops)',
+        active: 'Neutralizes station saboteur before the orbital uplink',
+        passive: 'Purges own neural memory lattice to prevent interrogation',
+        gates: [{ id: 'g5', type: 'Ry', theta: Math.PI / 2, position: 0.28 }]
+      },
+      {
+        id: 'q6',
+        name: 'Autonomous Defense Array',
+        active: 'Deploys autonomous hunter-seeker swarms across the perimeter',
+        passive: 'Shuts down defensive grid to avert cascading reactor meltdown',
+        gates: []
+      },
+      {
+        id: 'q7',
+        name: 'Commander Ren (Insurgents)',
+        active: 'Seizes orbital shipyard cannons and threatens the capital',
+        passive: 'Orders guerrilla freighters to disperse into asteroid belt',
+        gates: []
+      },
+      {
+        id: 'q8',
+        name: 'The Dyson Custodian',
+        active: 'Activates solar-flare harvester, dimming the system sun',
+        passive: 'Redirects coronal mass ejection away from colony world',
+        gates: []
+      },
+      {
+        id: 'q9',
+        name: 'Dr. Aris (Chrono-Archivist)',
+        active: 'Transmits humanity survival archive across deep cosmic relays',
+        passive: 'Records final silent extinction of the solar system',
+        gates: []
+      },
     ],
     connections: [
-      { id: 'c0', type: 'CNOT', control: 0, target: 1, position: 0.35, parity: 'even' },
-      { id: 'c1', type: 'CNOT', control: 1, target: 4, position: 0.5, parity: 'even' },
-      { id: 'c2', type: 'CNOT', control: 2, target: 3, position: 0.4, parity: 'odd' },
-      { id: 'c3', type: 'CNOT', control: 3, target: 7, position: 0.6, parity: 'even' },
-      { id: 'c4', type: 'CNOT', control: 1, target: 8, position: 0.75, parity: 'odd' },
-      { id: 'c5', type: 'CNOT', control: 8, target: 9, position: 0.85, parity: 'odd' },
+      { id: 'c0', type: 'CNOT', controls: [0], control: 0, target: 1, position: 0.34, parity: 'even' },
+      { id: 'c1', type: 'CCNOT', controls: [0, 1], control: 1, target: 4, position: 0.48, parity: 'even' },
+      { id: 'c2', type: 'CNOT', controls: [2], control: 2, target: 3, position: 0.42, parity: 'odd' },
+      { id: 'c3', type: 'CNOT', controls: [3], control: 3, target: 7, position: 0.62, parity: 'even' },
+      { id: 'c4', type: 'CNOT', controls: [5], control: 5, target: 6, position: 0.54, parity: 'even' },
+      { id: 'c5', type: 'CNOT', controls: [1], control: 1, target: 8, position: 0.74, parity: 'odd' },
+      { id: 'c6', type: 'CNOT', controls: [8], control: 8, target: 9, position: 0.86, parity: 'odd' },
     ]
   }
 };
@@ -87,6 +156,13 @@ export default function App() {
 
   // Modals & Sidebar state
   const [showNarrativesSidebar, setShowNarrativesSidebar] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    try {
+      const saved = localStorage.getItem('narratives_sidebar_width');
+      if (saved) return Math.max(384, Math.min(window.innerWidth - 80, parseInt(saved, 10)));
+    } catch { }
+    return 384;
+  });
   const [showStoryGenerator, setShowStoryGenerator] = useState(false);
   const [storyGeneratorInitialState, setStoryGeneratorInitialState] = useState(null);
   const [showStateDistribution, setShowStateDistribution] = useState(false);
@@ -110,6 +186,7 @@ export default function App() {
   });
   const [selectedQubit, setSelectedQubit] = useState(null);
   const [editingGate, setEditingGate] = useState(null); // { qubitId, gateId, gate, screenX, screenY }
+  const [editingConnection, setEditingConnection] = useState(null); // connection object for ConnectionModal
 
   // Save / Load / Tutorial / Progress Guard states
   const [isDirty, setIsDirty] = useState(false);
@@ -152,12 +229,16 @@ export default function App() {
       }
     }
     for (const conn of connections) {
+      const ctrls = getControls(conn);
       list.push({
         position: conn.position ?? 0.5,
-        type: 'CNOT',
+        type: ctrls.length > 1 ? 'CCNOT' : 'CNOT',
         target: conn.target,
-        control: conn.control,
-        params: { parity: conn.parity || 'even' },
+        control: ctrls[0] ?? null,
+        params: {
+          parity: conn.parity || 'even',
+          controls: ctrls,
+        },
       });
     }
     list.sort((a, b) => a.position - b.position);
@@ -197,10 +278,12 @@ export default function App() {
   // ── Handlers ──────────────────────────────────────────────────────────
 
   const addConnection = useCallback((control, target, position = 0.5, parity = 'even') => {
+    const ctrls = Array.isArray(control) ? control : [control];
     setConnections(prev => [...prev, {
       id: `cnot-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-      type: 'CNOT',
-      control,
+      type: ctrls.length > 1 ? 'CCNOT' : 'CNOT',
+      controls: ctrls,
+      control: ctrls[0],
       target,
       position,
       parity,
@@ -213,6 +296,30 @@ export default function App() {
       if (c.id !== connId) return c;
       const newParity = c.parity === 'odd' ? 'even' : 'odd';
       return { ...c, parity: newParity };
+    }));
+    setIsDirty(true);
+  }, []);
+
+  const handleAddControlToConnection = useCallback((connId, worldlineIdx) => {
+    setConnections(prev => prev.map(c => {
+      if (c.id !== connId) return c;
+      const currentControls = getControls(c);
+      if (currentControls.includes(worldlineIdx) || c.target === worldlineIdx) return c;
+      const newControls = [...currentControls, worldlineIdx].sort((a, b) => a - b);
+      return {
+        ...c,
+        type: newControls.length > 1 ? 'CCNOT' : 'CNOT',
+        controls: newControls,
+        control: newControls[0],
+      };
+    }));
+    setIsDirty(true);
+  }, []);
+
+  const handleUpdateConnection = useCallback((connId, updates) => {
+    setConnections(prev => prev.map(c => {
+      if (c.id !== connId) return c;
+      return { ...c, ...updates };
     }));
     setIsDirty(true);
   }, []);
@@ -304,12 +411,20 @@ export default function App() {
       // Clean up connections attached to this index and re-index higher indices
       setConnections(conns =>
         conns
-          .filter(c => c.control !== idx && c.target !== idx)
-          .map(c => ({
-            ...c,
-            control: c.control > idx ? c.control - 1 : c.control,
-            target: c.target > idx ? c.target - 1 : c.target,
-          }))
+          .map(c => {
+            const ctrls = getControls(c)
+              .filter(ctrlIdx => ctrlIdx !== idx)
+              .map(ctrlIdx => (ctrlIdx > idx ? ctrlIdx - 1 : ctrlIdx));
+            const newTarget = c.target > idx ? c.target - 1 : c.target;
+            return {
+              ...c,
+              type: ctrls.length > 1 ? 'CCNOT' : 'CNOT',
+              controls: ctrls,
+              control: ctrls[0] ?? null,
+              target: newTarget,
+            };
+          })
+          .filter(c => c.controls.length > 0 && c.target !== idx)
       );
       return prev.filter(q => q.id !== qubitId);
     });
@@ -466,6 +581,14 @@ export default function App() {
         }];
       });
       setIsDirty(true);
+    } else if (actionType === 'LOAD_10_QUBIT_DEMO') {
+      const epic = DEFAULT_PRESETS.epic_10;
+      setQubits(epic.qubits);
+      setConnections(epic.connections);
+      setEditingGate(null);
+      setScrubberPosition(1.0);
+      setShowNarrativesSidebar(true);
+      setIsDirty(false);
     }
   };
 
@@ -710,6 +833,8 @@ export default function App() {
             onRemoveConnection={handleRemoveConnection}
             onRemoveWorldline={removeWorldlineById}
             onAddWorldline={addWorldline}
+            onAddControlToConnection={handleAddControlToConnection}
+            onConfigureConnection={(conn) => setEditingConnection(conn)}
           />
 
           {/* Floating Quick Action Badge */}
@@ -722,9 +847,11 @@ export default function App() {
               <span className="text-slate-300">·</span>
               <span><strong className="text-indigo-600 font-semibold">Right-click H-Gate</strong> for bias & delete menu</span>
               <span className="text-slate-300">·</span>
-              <span><strong className="text-purple-700 font-semibold">Drag line-to-line</strong> to Entangle</span>
+              <span><strong className="text-purple-700 font-semibold">Drag line-to-line</strong> to Entangle / Add Control (CCNOT)</span>
               <span className="text-slate-300">·</span>
               <span><strong className="text-amber-700 font-semibold">Click Parity Badge</strong> to toggle AND/OR</span>
+              <span className="text-slate-300">·</span>
+              <span><strong className="text-indigo-700 font-semibold">Click ⚙</strong> to edit multi-controls</span>
             </span>
           </div>
 
@@ -748,6 +875,8 @@ export default function App() {
         {/* ── Toggle-able Possible Narratives Sidebar ───────────────────── */}
         {showNarrativesSidebar && (
           <NarrativesSidebar
+            width={sidebarWidth}
+            onWidthChange={setSidebarWidth}
             simulator={simulator}
             qubits={qubits}
             connections={connections}
@@ -856,6 +985,17 @@ export default function App() {
         />
       )}
 
+      {/* Entanglement Connection Modal (CCNOT / MCX / CNOT) */}
+      {editingConnection && (
+        <ConnectionModal
+          connection={editingConnection}
+          qubits={qubits}
+          onUpdateConnection={handleUpdateConnection}
+          onRemoveConnection={handleRemoveConnection}
+          onClose={() => setEditingConnection(null)}
+        />
+      )}
+
       {/* About & Game Integration Modal */}
       {showAboutModal && (
         <AboutModal
@@ -905,6 +1045,7 @@ export default function App() {
         onOpenStoryModal={() => setShowStoryGenerator(true)}
         onOpenSaveLoadModal={() => setShowSaveLoadModal(true)}
         isSidebarOpen={showNarrativesSidebar}
+        sidebarWidth={sidebarWidth}
         onOpenSidebar={() => setShowNarrativesSidebar(true)}
         onCloseSidebar={() => setShowNarrativesSidebar(false)}
         qubits={qubits}

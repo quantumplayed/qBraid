@@ -79,21 +79,36 @@ The fabric of the multiverse crystallizes into Timeline State |{current_quantum_
 
 `;
 
+function getControls(conn) {
+    if (Array.isArray(conn?.controls)) return conn.controls;
+    if (Array.isArray(conn?.control)) return conn.control;
+    if (conn?.control !== undefined && conn?.control !== null) return [conn.control];
+    return [];
+}
+
     // 4. Story Knots with Conditional Weaves
     qubitVarMap.forEach((q, idx) => {
         const isLast = idx === qubitVarMap.length - 1;
         const nextKnot = isLast ? 'multiverse_resolution' : qubitVarMap[idx + 1].knotName;
 
         // Entanglements mentioning this beat
-        const relatedConns = connections.filter(c => c.control === idx || c.target === idx);
+        const relatedConns = connections.filter(c => getControls(c).includes(idx) || c.target === idx);
 
         ink += `=== ${q.knotName} ===
 // Story Beat: ${q.name}`;
         if (relatedConns.length > 0) {
             const connNotes = relatedConns.map(c => {
-                const partnerIdx = c.control === idx ? c.target : c.control;
-                const partnerName = qubits[partnerIdx]?.name || `q${partnerIdx}`;
-                return `${c.parity === 'odd' ? 'Odd Parity (Conflict)' : 'Even Parity (Co-occur)'} with ${partnerName}`;
+                const ctrls = getControls(c);
+                const isTarget = c.target === idx;
+                const gateName = ctrls.length === 2 ? 'CCNOT' : (ctrls.length > 2 ? `${ctrls.length}-CX` : 'CNOT');
+                const parityText = c.parity === 'odd' ? 'Odd Parity (Conflict)' : 'Even Parity (Co-occur)';
+                if (isTarget) {
+                    const ctrlNames = ctrls.map(ci => qubits[ci]?.name || `q${ci}`).join(' & ');
+                    return `${gateName} Conditioned on [${ctrlNames}] (${parityText})`;
+                } else {
+                    const targetName = qubits[c.target]?.name || `q${c.target}`;
+                    return `Controls ${targetName} via ${gateName} (${parityText})`;
+                }
             }).join(', ');
             ink += ` [Entangled: ${connNotes}]`;
         }

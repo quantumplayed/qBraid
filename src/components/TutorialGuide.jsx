@@ -16,6 +16,7 @@ export default function TutorialGuide({
   onOpenSidebar,
   onCloseSidebar,
   isSidebarOpen,
+  sidebarWidth = 384,
   qubits = [],
   connections = [],
 }) {
@@ -66,11 +67,11 @@ export default function TutorialGuide({
     };
   }, [isDragging]);
 
-  // Sidebar triggers when stepping into Step 6 or Step 9
+  // Sidebar triggers when stepping into Step 6, Step 9, or Step 10
   useEffect(() => {
     if (currentStep === 6 && !isSidebarOpen) {
       onOpenSidebar?.();
-    } else if (currentStep === 9 && !isSidebarOpen) {
+    } else if ((currentStep === 9 || currentStep === 10) && !isSidebarOpen) {
       onOpenSidebar?.();
     }
   }, [currentStep, isSidebarOpen, onOpenSidebar]);
@@ -303,10 +304,33 @@ export default function TutorialGuide({
           <br />
           Dragging the scrubber from <strong className="text-slate-800">Start</strong> to <strong className="text-slate-800">End</strong> travels through narrative time. Notice how gates and connections take effect chronologically as the vertical laser line crosses them!
           <br /><br />
-          🎉 <strong>Congratulations!</strong> You have mastered quantum narrative entangling.
+          Click <strong className="text-emerald-700">Next →</strong> below for our Grand Finale: a full 10-qubit hard sci-fi multiverse showcase!
         </div>
       ),
       actionLabel: null,
+    },
+    {
+      step: 10,
+      title: '10. Grand Finale: 10-Qubit Sci-Fi Multiverse Showcase',
+      badge: '10-Qubit Showcase',
+      description: (
+        <div>
+          You have mastered the mechanics of quantum narrative entangling!
+          <br /><br />
+          Now experience the true power of <strong className="text-slate-900">qBraid</strong> at full scale.
+          <br /><br />
+          Click the button below to launch <strong className="text-sky-700">Project Event Horizon: The Chronos Deep Expedition</strong> — an interconnected 10-character hard sci-fi multiverse spanning relativistic singularities, alien progenitor pathogens, and dying stars.
+          <br /><br />
+          Explore the Possible Narratives side panel, inspect branches, scroll or zoom the canvas, and drag the timeline scrubber across causal time!
+          {qubits.length >= 10 && (
+            <div className="mt-3 p-2.5 bg-emerald-50 text-emerald-800 rounded-lg text-xs font-semibold border border-emerald-200 flex items-center gap-1.5">
+              <span>🚀</span> 10-Qubit Multiverse active! Canvas navigation (wheel scroll, drag pan, zoom) is enabled.
+            </div>
+          )}
+        </div>
+      ),
+      actionLabel: qubits.length >= 10 ? '🔄 Reload 10-Qubit Sci-Fi Showcase' : '🚀 Launch 10-Qubit Sci-Fi Showcase',
+      actionType: 'LOAD_10_QUBIT_DEMO',
     },
   ];
 
@@ -329,7 +353,7 @@ export default function TutorialGuide({
         position: 'fixed',
         ...(position
           ? { top: `${position.y}px`, left: `${position.x}px` }
-          : { bottom: '24px', right: isSidebarOpen ? '410px' : '24px' }),
+          : { bottom: '24px', right: isSidebarOpen ? `${sidebarWidth + 24}px` : '24px' }),
         width: '420px',
         maxWidth: 'calc(100vw - 48px)',
         background: '#ffffff',

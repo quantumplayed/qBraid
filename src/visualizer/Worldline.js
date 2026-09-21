@@ -21,6 +21,7 @@ export default class Worldline extends PIXI.Container {
         y,
         x,
         lineWidth,
+        startNodeWidth,
         gates = [],
         isUncertain = false,
         hasPhaseInterference = false,
@@ -31,6 +32,7 @@ export default class Worldline extends PIXI.Container {
 
         this.qubitId = id;
         this.qubitName = name;
+        this.displayName = this._formatDisplayName(name);
         this.lineY = y;
         this.lineX = x;
         this.lineWidth = lineWidth;
@@ -40,8 +42,10 @@ export default class Worldline extends PIXI.Container {
         this.scrubberPosition = scrubberPosition ?? 1.0;
         this.uncertainSegments = uncertainSegments || [];
 
-        // Node pill width offset: line starts after the start node pill
-        this.START_NODE_WIDTH = 130;
+        // Scaled storybox width based on text length (up to 20 chars + '...')
+        const extraChars = Math.max(0, this.displayName.length - 8);
+        const dynamicWidth = Math.min(235, Math.max(130, Math.round(126 + extraChars * 7.4)));
+        this.START_NODE_WIDTH = startNodeWidth || dynamicWidth;
 
         // Internal state
         this._hoverActive = false;
@@ -64,6 +68,11 @@ export default class Worldline extends PIXI.Container {
         this._buildGateDiamonds();
         this._buildHoverDot();
         this._buildStartNodeCard();
+    }
+
+    _formatDisplayName(rawName) {
+        const str = (rawName || '').trim();
+        return str.length > 20 ? str.slice(0, 20) + '...' : str;
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -396,9 +405,9 @@ export default class Worldline extends PIXI.Container {
         nodeDot.fill();
         this.startCard.addChild(nodeDot);
 
-        // Character / Beat Name Text
+        // Character / Beat Name Text (truncated to 20 chars + '...' if longer)
         this.cardLabel = new PIXI.Text({
-            text: this.qubitName,
+            text: this.displayName,
             style: {
                 fontFamily: '"Inter", system-ui, sans-serif',
                 fontSize: 11,
@@ -613,7 +622,8 @@ export default class Worldline extends PIXI.Container {
     updateData({ name, gates, isUncertain, hasPhaseInterference, scrubberPosition, uncertainSegments }) {
         if (name !== undefined && name !== this.qubitName) {
             this.qubitName = name;
-            if (this.cardLabel) this.cardLabel.text = name;
+            this.displayName = this._formatDisplayName(name);
+            if (this.cardLabel) this.cardLabel.text = this.displayName;
         }
         let needsRedraw = false;
         if (gates !== undefined) {

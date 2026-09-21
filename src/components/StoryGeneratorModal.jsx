@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 
+function getControls(conn) {
+    if (Array.isArray(conn?.controls)) return conn.controls;
+    if (Array.isArray(conn?.control)) return conn.control;
+    if (conn?.control !== undefined && conn?.control !== null) return [conn.control];
+    return [];
+}
+
 /**
  * StoryGeneratorModal
  * Samples consistent multiverse storylines from the quantum probability distribution.
@@ -42,7 +49,7 @@ export default function StoryGeneratorModal({
 
                 const beatOutcomes = sampled.beatOutcomes.map((beat, idx) => {
                     const relevantConns = connections.filter(
-                        c => c.control === idx || c.target === idx
+                        c => getControls(c).includes(idx) || c.target === idx
                     );
                     return {
                         ...beat,
@@ -65,7 +72,7 @@ export default function StoryGeneratorModal({
                 const beatOutcomes = qubits.map((q, idx) => {
                     const isBit1 = bitstring[idx] === '1';
                     const relevantConns = connections.filter(
-                        c => c.control === idx || c.target === idx
+                        c => getControls(c).includes(idx) || c.target === idx
                     );
 
                     return {
@@ -290,9 +297,20 @@ export default function StoryGeneratorModal({
                                                     {beat.connections.length > 0 && (
                                                         <div className="mt-2 pt-2 border-t border-slate-200/80 flex flex-wrap gap-1">
                                                             {beat.connections.map((conn, ci) => {
-                                                                const otherIdx = conn.control === idx ? conn.target : conn.control;
-                                                                const otherName = qubits[otherIdx]?.name || `q${otherIdx}`;
+                                                                const ctrls = getControls(conn);
+                                                                const isTarget = conn.target === idx;
                                                                 const isOdd = conn.parity === 'odd';
+                                                                const gateLabel = ctrls.length === 2 ? 'CCNOT' : (ctrls.length > 2 ? `${ctrls.length}-CX` : 'CNOT');
+
+                                                                let text = '';
+                                                                if (isTarget) {
+                                                                    const ctrlNames = ctrls.map(c => qubits[c]?.name || `q${c}`).join(' & ');
+                                                                    text = `${isOdd ? 'OR-Conditioned on' : 'AND-Conditioned on'} ${ctrlNames} (${gateLabel})`;
+                                                                } else {
+                                                                    const targetName = qubits[conn.target]?.name || `q${conn.target}`;
+                                                                    text = `Controls ${targetName} (${gateLabel})`;
+                                                                }
+
                                                                 return (
                                                                     <span
                                                                         key={ci}
@@ -302,7 +320,7 @@ export default function StoryGeneratorModal({
                                                                                 : 'bg-indigo-50 border-indigo-200 text-indigo-800'
                                                                         }`}
                                                                     >
-                                                                        {isOdd ? '≠ Odd Bell Pair' : '= Even Bell Pair'} with {otherName}
+                                                                        {text}
                                                                     </span>
                                                                 );
                                                             })}

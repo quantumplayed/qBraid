@@ -1,6 +1,13 @@
 import * as PIXI from 'pixi.js';
 import Worldline from './Worldline.js';
 
+function getControls(conn) {
+  if (Array.isArray(conn?.controls)) return conn.controls;
+  if (Array.isArray(conn?.control)) return conn.control;
+  if (conn?.control !== undefined && conn?.control !== null) return [conn.control];
+  return [];
+}
+
 /**
  * Main Pixi.js scene for the Narrative Entangler.
  * Manages worldlines, hover broadcasting, drag-to-connect threads,
@@ -16,6 +23,8 @@ export default class PixiScene {
     // Callbacks
     this.onCNOTCreate = options.onCNOTCreate || (() => { });
     this.onToggleConnectionParity = options.onToggleConnectionParity || (() => { });
+    this.onAddControlToConnection = options.onAddControlToConnection || (() => { });
+    this.onConfigureConnection = options.onConfigureConnection || (() => { });
     this.onEditQubit = options.onEditQubit || (() => { });
     this.onPlaceGate = options.onPlaceGate || (() => { });
     this.onEditGate = options.onEditGate || (() => { });
@@ -61,7 +70,18 @@ export default class PixiScene {
     this._cursorX = -1000;
     this._cursorY = -1000;
 
-    // Layers
+    // Zoom & Pan navigation state
+    this.zoom = 1.0;
+    this.panX = 0;
+    this.scrollY = 0;
+    this._isPanning = false;
+    this._panStartX = 0;
+    this._panStartY = 0;
+    this._wheelHandler = null;
+    this.onZoomChange = options.onZoomChange || (() => {});
+
+    // Layers & Hierarchy
+    this._contentContainer = null;
     this._connectionLayer = null;
     this._worldlineLayer = null;
 
@@ -107,13 +127,17 @@ export default class PixiScene {
         const mouseX = e.clientX - canvasRect.left;
         const mouseY = e.clientY - canvasRect.top;
 
+        // Convert to content coordinates
+        const contentX = (mouseX - this.panX) / this.zoom;
+        const contentY = (mouseY - this.scrollY) / this.zoom;
+
         for (const wl of this.worldlines) {
-          if (Math.abs(mouseY - wl.lineY) < 22) {
+          if (Math.abs(contentY - wl.lineY) < 24) {
             const usableStart = wl.lineX + wl.START_NODE_WIDTH + 8;
             const totalUsableWidth = wl.lineWidth - wl.START_NODE_WIDTH - 8;
             for (const gate of wl.gates) {
               const gx = usableStart + gate.position * totalUsableWidth;
-              if (Math.abs(mouseX - gx) < 24) {
+              if (Math.abs(contentX - gx) < 24) {
                 this.onGateContextMenu({
                   qubitId: wl.qubitId,
                   gateId: gate.id,
@@ -128,25 +152,51 @@ export default class PixiScene {
         }
       });
 
-      // Layers (bottom to top: worldlines -> connections -> drag thread)
+      // Wheel listener for smooth trackpad / mouse scroll and Ctrl+wheel zoom
+      this._wheelHandler = (e) => {
+        e.preventDefault();
+        const canvasRect = this.app.canvas.getBoundingClientRect();
+        const mouseX = e.clientX - canvasRect.left;
+        const mouseY = e.clientY - canvasRect.top;
+
+        if (e.ctrlKey || e.metaKey) {
+          // Zoom in / out toward mouse cursor
+          const factor = e.deltaY < 0 ? 1.08 : 0.92;
+          this.setZoom(this.zoom * factor, mouseX, mouseY);
+        } else {
+          // Smooth pan / scroll
+          this.scrollY -= e.deltaY;
+          this.panX -= e.deltaX;
+          this._clampPanAndScroll();
+          this._applyContentTransform();
+        }
+      };
+      this.app.canvas.addEventListener('wheel', this._wheelHandler, { passive: false });
+
+      // Transformable Content Container (holds worldlines, connections, drag thread, tutorial)
+      this._contentContainer = new PIXI.Container();
+      this.stage.addChild(this._contentContainer);
+
+      // Layers inside Content Container (scale and scroll with navigation)
       this._worldlineLayer = new PIXI.Container();
-      this.stage.addChild(this._worldlineLayer);
+      this._contentContainer.addChild(this._worldlineLayer);
 
       this._connectionLayer = new PIXI.Container();
       this._connectionLayer.eventMode = 'passive';
-      this.stage.addChild(this._connectionLayer);
+      this._contentContainer.addChild(this._connectionLayer);
 
       this._dragThread = new PIXI.Graphics();
       this._dragThread.eventMode = 'none';
-      this.stage.addChild(this._dragThread);
-
-      this._scrubberLayer = new PIXI.Container();
-      this._scrubberLayer.eventMode = 'passive';
-      this.stage.addChild(this._scrubberLayer);
+      this._contentContainer.addChild(this._dragThread);
 
       this._tutorialLayer = new PIXI.Container();
       this._tutorialLayer.eventMode = 'none';
-      this.stage.addChild(this._tutorialLayer);
+      this._contentContainer.addChild(this._tutorialLayer);
+
+      // Scrubber stays fixed at the viewport bottom directly on stage
+      this._scrubberLayer = new PIXI.Container();
+      this._scrubberLayer.eventMode = 'passive';
+      this.stage.addChild(this._scrubberLayer);
 
       this._potentialDrag = null;
       this._linePointerDown = null;
@@ -196,15 +246,116 @@ export default class PixiScene {
   //  WORLDLINE MANAGEMENT
   // ═══════════════════════════════════════════════════════════════════════
 
+  _calcStartNodeWidth() {
+    let maxLen = 0;
+    for (const q of this.qubits) {
+      const name = (q.name || '').trim();
+      const len = Math.min(name.length, 20) + (name.length > 20 ? 3 : 0);
+      if (len > maxLen) maxLen = len;
+    }
+    const extraChars = Math.max(0, maxLen - 8);
+    return Math.min(235, Math.max(130, Math.round(126 + extraChars * 7.4)));
+  }
+
   _getLayout() {
     const padding = 80;
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
+    const startNodeWidth = this._calcStartNodeWidth();
+    const nodeOffset = startNodeWidth + 8;
     const lineWidth = w - padding * 2;
+    const usableStart = padding + nodeOffset;
+    const usableWidth = lineWidth - nodeOffset;
     const count = Math.max(this.qubits.length, 1);
-    const lineSpacing = (h - padding * 2) / (count + 1);
+    const minSpacing = count >= 6 ? 60 : 68;
+    const lineSpacing = Math.max(minSpacing, (h - padding * 2) / (count + 1));
+    const totalContentHeight = padding * 2 + lineSpacing * (count + 1) + 40;
 
-    return { padding, lineWidth, lineSpacing, w, h };
+    return { padding, startNodeWidth, nodeOffset, usableStart, usableWidth, lineWidth, lineSpacing, totalContentHeight, w, h };
+  }
+
+  _clampPanAndScroll() {
+    const { totalContentHeight, lineWidth, padding, w, h } = this._getLayout();
+    const scaledHeight = totalContentHeight * this.zoom;
+    const scaledWidth = (lineWidth + padding * 2) * this.zoom;
+
+    // Vertical clamping
+    if (scaledHeight <= h - 40) {
+      this.scrollY = 0;
+    } else {
+      const minScrollY = (h - 50) - scaledHeight;
+      const maxScrollY = 30;
+      this.scrollY = Math.min(maxScrollY, Math.max(minScrollY, this.scrollY));
+    }
+
+    // Horizontal clamping: keep content on screen
+    const minPanX = Math.min(0, w - scaledWidth - 40);
+    const maxPanX = Math.max(0, 40);
+    this.panX = Math.min(maxPanX, Math.max(minPanX, this.panX));
+  }
+
+  _applyContentTransform() {
+    if (!this._contentContainer) return;
+    this._contentContainer.position.set(this.panX, this.scrollY);
+    this._contentContainer.scale.set(this.zoom);
+    this._drawScrubber();
+  }
+
+  setZoom(newZoom, pivotX = this.container.clientWidth / 2, pivotY = this.container.clientHeight / 2) {
+    const clampedZoom = Math.max(0.45, Math.min(2.0, newZoom));
+    if (Math.abs(clampedZoom - this.zoom) < 0.001) return;
+
+    const contentX = (pivotX - this.panX) / this.zoom;
+    const contentY = (pivotY - this.scrollY) / this.zoom;
+
+    this.zoom = clampedZoom;
+
+    this.panX = pivotX - contentX * this.zoom;
+    this.scrollY = pivotY - contentY * this.zoom;
+
+    this._clampPanAndScroll();
+    this._applyContentTransform();
+
+    if (this.onZoomChange) {
+      this.onZoomChange(this.zoom);
+    }
+  }
+
+  zoomIn() {
+    this.setZoom(this.zoom * 1.2);
+  }
+
+  zoomOut() {
+    this.setZoom(this.zoom / 1.2);
+  }
+
+  resetView() {
+    this.zoom = 1.0;
+    this.panX = 0;
+    this.scrollY = 0;
+    this._clampPanAndScroll();
+    this._applyContentTransform();
+    if (this.onZoomChange) {
+      this.onZoomChange(this.zoom);
+    }
+  }
+
+  fitToScreen() {
+    const { totalContentHeight, h } = this._getLayout();
+    const availableH = h - 65; // leave room for scrubber
+    if (totalContentHeight > availableH) {
+      const targetZoom = Math.max(0.48, Math.min(1.0, availableH / totalContentHeight));
+      this.zoom = targetZoom;
+      this.scrollY = 15;
+      this.panX = 0;
+      this._clampPanAndScroll();
+      this._applyContentTransform();
+      if (this.onZoomChange) {
+        this.onZoomChange(this.zoom);
+      }
+    } else {
+      this.resetView();
+    }
   }
 
   _rebuildWorldlines() {
@@ -215,7 +366,7 @@ export default class PixiScene {
     }
     this.worldlines = [];
 
-    const { padding, lineWidth, lineSpacing } = this._getLayout();
+    const { padding, lineWidth, lineSpacing, startNodeWidth } = this._getLayout();
 
     for (let i = 0; i < this.qubits.length; i++) {
       const q = this.qubits[i];
@@ -228,6 +379,7 @@ export default class PixiScene {
         y,
         x: padding,
         lineWidth,
+        startNodeWidth,
         gates: q.gates || [],
         isUncertain,
         hasPhaseInterference: this.hasPhaseInterference,
@@ -366,87 +518,103 @@ export default class PixiScene {
 
     for (let ci = 0; ci < this.connections.length; ci++) {
       const conn = this.connections[ci];
-      if (conn.type !== 'CNOT') continue;
+      if (conn.type !== 'CNOT' && conn.type !== 'CCNOT' && conn.type !== 'MCX') continue;
 
-      const controlWl = this.worldlines[conn.control];
+      const ctrls = getControls(conn);
+      const ctrlWls = ctrls.map(c => this.worldlines[c]).filter(Boolean);
       const targetWl = this.worldlines[conn.target];
-      if (!controlWl || !targetWl) continue;
+      if (ctrlWls.length === 0 || !targetWl) continue;
 
       const pos = conn.position ?? 0.5;
-      const usableStart = controlWl.lineX + 138;
-      const usableWidth = controlWl.lineWidth - 138;
+      const refWl = ctrlWls[0] || targetWl;
+      const usableStart = refWl.lineX + refWl.START_NODE_WIDTH + 8;
+      const usableWidth = refWl.lineWidth - refWl.START_NODE_WIDTH - 8;
       const x = usableStart + usableWidth * pos;
-      const y1 = controlWl.lineY;
-      const y2 = targetWl.lineY;
+
+      const allY = [...ctrlWls.map(w => w.lineY), targetWl.lineY];
+      const minY = Math.min(...allY);
+      const maxY = Math.max(...allY);
+      const midY = (minY + maxY) / 2;
+
       const isOdd = conn.parity === 'odd';
       const isFuture = pos > (this.scrubberPosition + 0.005);
+      const isMultiControl = ctrlWls.length > 1;
 
       const connContainer = new PIXI.Container();
       connContainer.eventMode = 'passive';
       connContainer.alpha = isFuture ? 0.28 : 1.0;
 
-      // Theme colors based on parity (Modern Bright)
-      const strokeColor = isOdd ? 0xd97706 : 0x7c3aed; // Amber vs Royal Purple
-      const glowColor = isOdd ? 0xfde68a : 0xddd6fe;
+      // Theme colors based on parity and control count
+      const strokeColor = isOdd ? 0xd97706 : (isMultiControl ? 0x6366f1 : 0x7c3aed);
+      const glowColor = isOdd ? 0xfde68a : (isMultiControl ? 0xc7d2fe : 0xddd6fe);
       const badgeBg = 0xffffff;
-      const badgeBorder = isOdd ? 0xd97706 : 0x7c3aed;
-      const textColor = isOdd ? 0xb45309 : 0x6d28d9;
+      const badgeBorder = strokeColor;
+      const textColor = isOdd ? 0xb45309 : (isMultiControl ? 0x4338ca : 0x6d28d9);
 
       const g = new PIXI.Graphics();
       g.eventMode = 'none';
 
-      // Vertical line glow
-      g.setStrokeStyle({ width: 5, color: glowColor, alpha: 0.5 });
-      g.moveTo(x, y1);
-      g.lineTo(x, y2);
+      // Vertical bus line glow
+      g.setStrokeStyle({ width: isMultiControl ? 6 : 5, color: glowColor, alpha: 0.6 });
+      g.moveTo(x, minY);
+      g.lineTo(x, maxY);
       g.stroke();
 
-      // Vertical line core
-      g.setStrokeStyle({ width: 2, color: strokeColor, alpha: 0.95 });
-      g.moveTo(x, y1);
-      g.lineTo(x, y2);
+      // Vertical bus line core
+      g.setStrokeStyle({ width: isMultiControl ? 2.5 : 2, color: strokeColor, alpha: 0.95 });
+      g.moveTo(x, minY);
+      g.lineTo(x, maxY);
       g.stroke();
 
-      // Control dot (filled circle with halo)
-      g.fill({ color: glowColor, alpha: 0.6 });
-      g.circle(x, y1, 8);
-      g.fill();
+      // Control dots (filled circles with halos on every control line)
+      for (const cWl of ctrlWls) {
+        const cy = cWl.lineY;
+        g.fill({ color: glowColor, alpha: 0.7 });
+        g.circle(x, cy, isMultiControl ? 9 : 8);
+        g.fill();
 
-      g.fill({ color: strokeColor, alpha: 1 });
-      g.circle(x, y1, 5);
-      g.fill();
+        g.fill({ color: strokeColor, alpha: 1 });
+        g.circle(x, cy, isMultiControl ? 5.5 : 5);
+        g.fill();
+      }
 
-      // Target ⊕ symbol (circle with plus)
+      // Target ⊕ symbol (circle with plus) on target line
+      const ty = targetWl.lineY;
       const tR = 9;
       g.setStrokeStyle({ width: 2, color: strokeColor, alpha: 1 });
-      g.circle(x, y2, tR);
+      g.circle(x, ty, tR);
       g.stroke();
-      g.moveTo(x - tR, y2);
-      g.lineTo(x + tR, y2);
+      g.moveTo(x - tR, ty);
+      g.lineTo(x + tR, ty);
       g.stroke();
-      g.moveTo(x, y2 - tR);
-      g.lineTo(x, y2 + tR);
+      g.moveTo(x, ty - tR);
+      g.lineTo(x, ty + tR);
       g.stroke();
 
       // Extra notch for odd parity target (inversion indicator)
       if (isOdd) {
         g.fill({ color: 0xd97706, alpha: 0.9 });
-        g.circle(x, y2, 3);
+        g.circle(x, ty, 3);
         g.fill();
       }
 
       connContainer.addChild(g);
 
-      // Midpoint for parity badge
-      const midY = (y1 + y2) / 2;
+      // Determine label text for parity pill
+      let labelText = isOdd ? 'OR' : 'AND';
+      if (ctrlWls.length === 2) {
+        labelText = isOdd ? '2-OR' : 'CCNOT';
+      } else if (ctrlWls.length > 2) {
+        labelText = `${ctrlWls.length}-${isOdd ? 'OR' : 'AND'}`;
+      }
 
-      // Parity Pill Container (AND / OR)
+      const badgeWidth = Math.max(54, labelText.length * 8.5 + 16);
+      const badgeHeight = 22;
+
+      // Parity Pill Container (AND / OR / CCNOT)
       const badgeContainer = new PIXI.Container();
       badgeContainer.x = x;
       badgeContainer.y = midY;
-
-      const badgeWidth = 54;
-      const badgeHeight = 22;
 
       const badgeGraphics = new PIXI.Graphics();
       const renderBadge = (isHover) => {
@@ -454,7 +622,7 @@ export default class PixiScene {
         badgeGraphics.fill({ color: isHover ? (isOdd ? 0xfffbeb : 0xf5f3ff) : badgeBg, alpha: 0.98 });
         badgeGraphics.setStrokeStyle({
           width: isHover ? 2 : 1.5,
-          color: isHover ? (isOdd ? 0xb45309 : 0x5b21b6) : badgeBorder,
+          color: isHover ? (isOdd ? 0xb45309 : 0x4f46e5) : badgeBorder,
           alpha: 1,
         });
         badgeGraphics.roundRect(-badgeWidth / 2, -badgeHeight / 2, badgeWidth, badgeHeight, 11);
@@ -466,7 +634,7 @@ export default class PixiScene {
       badgeContainer.addChild(badgeGraphics);
 
       const badgeText = new PIXI.Text({
-        text: isOdd ? 'OR' : 'AND',
+        text: labelText,
         style: {
           fontFamily: '"Inter", system-ui, sans-serif',
           fontSize: 10,
@@ -482,7 +650,7 @@ export default class PixiScene {
       // Interactive toggle hit area on badgeContainer
       badgeContainer.eventMode = 'static';
       badgeContainer.cursor = 'pointer';
-      badgeContainer.hitArea = new PIXI.Rectangle(-badgeWidth / 2 - 8, -badgeHeight / 2 - 6, badgeWidth + 16, badgeHeight + 12);
+      badgeContainer.hitArea = new PIXI.Rectangle(-badgeWidth / 2 - 6, -badgeHeight / 2 - 6, badgeWidth + 12, badgeHeight + 12);
 
       const connId = conn.id;
       badgeContainer.on('pointerdown', (e) => {
@@ -499,9 +667,59 @@ export default class PixiScene {
         renderBadge(false);
       });
 
-      // Small Delete Button (✕) next to the badge
+      // Configure / Inspector Button (⚙) next to the badge
+      const cfgContainer = new PIXI.Container();
+      cfgContainer.x = x + badgeWidth / 2 + 13;
+      cfgContainer.y = midY;
+
+      const cfgBg = new PIXI.Graphics();
+      const renderCfg = (isHover) => {
+        cfgBg.clear();
+        cfgBg.fill({ color: isHover ? 0xe0e7ff : 0xffffff, alpha: isHover ? 1 : 0.98 });
+        cfgBg.setStrokeStyle({ width: 1, color: isHover ? 0x6366f1 : 0xcbd5e1, alpha: 1 });
+        cfgBg.circle(0, 0, 8);
+        cfgBg.fill();
+        cfgBg.stroke();
+      };
+      renderCfg(false);
+      cfgBg.eventMode = 'none';
+      cfgContainer.addChild(cfgBg);
+
+      const cfgText = new PIXI.Text({
+        text: '⚙',
+        style: {
+          fontFamily: 'system-ui',
+          fontSize: 9,
+          fill: 0x475569,
+        },
+      });
+      cfgText.anchor.set(0.5, 0.5);
+      cfgText.eventMode = 'none';
+      cfgContainer.addChild(cfgText);
+
+      cfgContainer.eventMode = 'static';
+      cfgContainer.cursor = 'pointer';
+      cfgContainer.hitArea = new PIXI.Circle(0, 0, 10);
+
+      cfgContainer.on('pointerover', () => {
+        renderCfg(true);
+        cfgText.style.fill = 0x4338ca;
+      });
+      cfgContainer.on('pointerout', () => {
+        renderCfg(false);
+        cfgText.style.fill = 0x475569;
+      });
+      cfgContainer.on('pointerdown', (e) => {
+        e.stopPropagation();
+        this._linePointerDown = null;
+        this._potentialDrag = null;
+        this._dragActive = false;
+        this.onConfigureConnection(conn);
+      });
+
+      // Small Delete Button (✕) next to the config button
       const delContainer = new PIXI.Container();
-      delContainer.x = x + badgeWidth / 2 + 14;
+      delContainer.x = x + badgeWidth / 2 + 33;
       delContainer.y = midY;
 
       const delBg = new PIXI.Graphics();
@@ -550,6 +768,7 @@ export default class PixiScene {
       });
 
       connContainer.addChild(badgeContainer);
+      connContainer.addChild(cfgContainer);
       connContainer.addChild(delContainer);
       this._connectionLayer.addChild(connContainer);
     }
@@ -563,9 +782,7 @@ export default class PixiScene {
     if (!this._scrubberLayer) return;
     this._scrubberLayer.removeChildren();
 
-    const { padding, lineWidth, h } = this._getLayout();
-    const usableStart = padding + 138;
-    const usableWidth = lineWidth - 138;
+    const { usableStart, usableWidth, h } = this._getLayout();
     const trackY = h - 28;
 
     const g = new PIXI.Graphics();
@@ -625,15 +842,16 @@ export default class PixiScene {
     this._scrubberLayer.addChild(label1);
 
     // Vertical holographic laser line up through all worldlines
+    const screenLaserX = this.panX + (usableStart + usableWidth * this.scrubberPosition) * this.zoom;
     const laser = new PIXI.Graphics();
     laser.setStrokeStyle({ width: 4, color: railColor, alpha: 0.22 });
-    laser.moveTo(curX, trackY - 8);
-    laser.lineTo(curX, padding - 15);
+    laser.moveTo(screenLaserX, trackY - 8);
+    laser.lineTo(screenLaserX, 0);
     laser.stroke();
 
     laser.setStrokeStyle({ width: 1.5, color: railColor, alpha: 0.85 });
-    laser.moveTo(curX, trackY - 8);
-    laser.lineTo(curX, padding - 15);
+    laser.moveTo(screenLaserX, trackY - 8);
+    laser.lineTo(screenLaserX, 0);
     laser.stroke();
     this._scrubberLayer.addChild(laser);
 
@@ -702,34 +920,31 @@ export default class PixiScene {
   }
 
   _isNearConnection(x, y) {
-    const { h } = this._getLayout();
-    if (y >= h - 48) return true; // Scrubber zone at the bottom
-
     for (const conn of this.connections) {
-      if (conn.type !== 'CNOT') continue;
-      const controlWl = this.worldlines[conn.control];
+      if (conn.type !== 'CNOT' && conn.type !== 'CCNOT' && conn.type !== 'MCX') continue;
+      const ctrls = getControls(conn);
+      const ctrlWls = ctrls.map(c => this.worldlines[c]).filter(Boolean);
       const targetWl = this.worldlines[conn.target];
-      if (!controlWl || !targetWl) continue;
+      if (ctrlWls.length === 0 || !targetWl) continue;
 
       const pos = conn.position ?? 0.5;
-      const usableStart = controlWl.lineX + (controlWl.START_NODE_WIDTH || 130) + 8;
-      const usableWidth = controlWl.lineWidth - (controlWl.START_NODE_WIDTH || 130) - 8;
+      const refWl = ctrlWls[0] || targetWl;
+      const usableStart = refWl.lineX + (refWl.START_NODE_WIDTH || 130) + 8;
+      const usableWidth = refWl.lineWidth - (refWl.START_NODE_WIDTH || 130) - 8;
       const cx = usableStart + usableWidth * pos;
-      const midY = (controlWl.lineY + targetWl.lineY) / 2;
 
-      // Parity badge: 90x24 at (cx, midY). Generous hit check
-      if (Math.abs(x - cx) <= 55 && Math.abs(y - midY) <= 18) {
-        return true;
-      }
-      // Delete button: radius 8 at cx + 45 + 14 = cx + 59
-      if (Math.abs(x - (cx + 59)) <= 16 && Math.abs(y - midY) <= 16) {
+      const allY = [...ctrlWls.map(w => w.lineY), targetWl.lineY];
+      const minY = Math.min(...allY);
+      const maxY = Math.max(...allY);
+      const midY = (minY + maxY) / 2;
+
+      // Parity badge, config & delete buttons area:
+      if (x >= cx - 40 && x <= cx + 65 && Math.abs(y - midY) <= 20) {
         return true;
       }
       // Vertical connection line and control/target endpoints
-      if (Math.abs(x - cx) <= 14) {
-        const minY = Math.min(controlWl.lineY, targetWl.lineY) - 12;
-        const maxY = Math.max(controlWl.lineY, targetWl.lineY) + 12;
-        if (y >= minY && y <= maxY) {
+      if (Math.abs(x - cx) <= 15) {
+        if (y >= minY - 14 && y <= maxY + 14) {
           return true;
         }
       }
@@ -738,26 +953,24 @@ export default class PixiScene {
   }
 
   // ═══════════════════════════════════════════════════════════════════════
-  //  POINTER / DRAG / CLICK-TO-PLACE
+  //  POINTER / DRAG / CLICK-TO-PLACE / PANNING
   // ═══════════════════════════════════════════════════════════════════════
 
   _onPointerDown(e) {
     // Left-click only
     if (e.button !== 0 && e.nativeEvent?.button !== 0) return;
 
-    const x = e.global.x;
-    const y = e.global.y;
+    const rawX = e.global.x;
+    const rawY = e.global.y;
 
-    const { padding, lineWidth, h } = this._getLayout();
-    const usableStart = padding + 138;
-    const usableWidth = lineWidth - 138;
+    const { usableStart, usableWidth, h } = this._getLayout();
     const trackY = h - 28;
 
-    // Timeline Scrubber track click / drag at the bottom
-    if (y >= trackY - 16 && y <= h && x >= usableStart - 12 && x <= usableStart + usableWidth + 12) {
+    // Timeline Scrubber track click / drag at the bottom (handled in screen space)
+    if (rawY >= trackY - 16 && rawY <= h && rawX >= usableStart - 12 && rawX <= usableStart + usableWidth + 12) {
       this._scrubberDragging = true;
       this._linePointerDown = null;
-      const frac = Math.max(0, Math.min(1, (x - usableStart) / usableWidth));
+      const frac = Math.max(0, Math.min(1, (rawX - usableStart) / usableWidth));
       this.scrubberPosition = frac;
       this.onScrubberChange(frac);
       this._drawScrubber();
@@ -765,8 +978,12 @@ export default class PixiScene {
       return;
     }
 
+    // Convert raw coordinates to content coordinates
+    const contentX = (rawX - this.panX) / this.zoom;
+    const contentY = (rawY - this.scrollY) / this.zoom;
+
     // Do NOT place gates or start drags if clicking any CNOT connection element
-    if (this._isNearConnection(x, y)) {
+    if (this._isNearConnection(contentX, contentY)) {
       this._linePointerDown = null;
       return;
     }
@@ -774,16 +991,16 @@ export default class PixiScene {
     // Check if clicked near any worldline track
     for (let i = 0; i < this.worldlines.length; i++) {
       const wl = this.worldlines[i];
-      if (wl.isNearY(y)) {
+      if (wl.isNearY(contentY)) {
         const usableStart = wl.lineX + wl.START_NODE_WIDTH + 8;
         const totalUsableWidth = wl.lineWidth - wl.START_NODE_WIDTH - 8;
 
         // Inside the track zone
-        if (x >= usableStart && x <= usableStart + totalUsableWidth) {
+        if (contentX >= usableStart && contentX <= usableStart + totalUsableWidth) {
           // Check if clicking an existing gate
           const onGate = wl.gates.find(gate => {
             const gx = usableStart + gate.position * totalUsableWidth;
-            return Math.abs(x - gx) < 18;
+            return Math.abs(contentX - gx) < 18;
           });
 
           if (onGate) {
@@ -792,8 +1009,8 @@ export default class PixiScene {
               qubitId: wl.qubitId,
               gateId: onGate.id,
               gate: onGate,
-              screenX: e.nativeEvent?.clientX ?? (canvasRect.left + x),
-              screenY: e.nativeEvent?.clientY ?? (canvasRect.top + y),
+              screenX: e.nativeEvent?.clientX ?? (canvasRect.left + rawX),
+              screenY: e.nativeEvent?.clientY ?? (canvasRect.top + rawY),
             });
             return;
           }
@@ -805,26 +1022,36 @@ export default class PixiScene {
             lineY: wl.lineY,
             startX: usableStart,
             totalWidth: totalUsableWidth,
-            clickX: x,
-            clickY: y,
+            clickX: contentX,
+            clickY: contentY,
+            rawClickX: rawX,
+            rawClickY: rawY,
             time: Date.now(),
           };
           return;
         }
       }
     }
+
+    // Clicked empty canvas -> initiate drag panning
+    this._isPanning = true;
+    this._panStartX = rawX - this.panX;
+    this._panStartY = rawY - this.scrollY;
+    if (this.app?.canvas) {
+      this.app.canvas.style.cursor = 'grabbing';
+    }
   }
 
   _onPointerMove(e) {
-    this._cursorX = e.global.x;
-    this._cursorY = e.global.y;
+    const rawX = e.global.x;
+    const rawY = e.global.y;
+    this._cursorX = rawX;
+    this._cursorY = rawY;
 
     // Detect timeline scrubber dragging
     if (this._scrubberDragging) {
-      const { padding, lineWidth } = this._getLayout();
-      const usableStart = padding + 138;
-      const usableWidth = lineWidth - 138;
-      const frac = Math.max(0, Math.min(1, (this._cursorX - usableStart) / usableWidth));
+      const { usableStart, usableWidth } = this._getLayout();
+      const frac = Math.max(0, Math.min(1, (rawX - usableStart) / usableWidth));
       this.scrubberPosition = frac;
       this.onScrubberChange(frac);
       this._drawScrubber();
@@ -832,20 +1059,33 @@ export default class PixiScene {
       return;
     }
 
+    // Handle background canvas panning
+    if (this._isPanning) {
+      this.panX = rawX - this._panStartX;
+      this.scrollY = rawY - this._panStartY;
+      this._clampPanAndScroll();
+      this._applyContentTransform();
+      return;
+    }
+
+    // Convert to content coordinates
+    const contentX = (rawX - this.panX) / this.zoom;
+    const contentY = (rawY - this.scrollY) / this.zoom;
+
     // Detect drag initiation from line press
     if (this._linePointerDown && !this._dragActive) {
       if (this.tutorialState?.active && this.tutorialState.step !== 5 && this.tutorialState.step !== 8) {
         // Drag blocked in non-drag tutorial steps
       } else {
-        const dx = this._cursorX - this._linePointerDown.clickX;
-        const dy = this._cursorY - this._linePointerDown.clickY;
+        const dx = rawX - this._linePointerDown.rawClickX;
+        const dy = rawY - this._linePointerDown.rawClickY;
         if (Math.sqrt(dx * dx + dy * dy) > 6) {
           this._dragActive = true;
           this._dragSourceId = this._linePointerDown.qubitId;
           this._dragSourceX = this._linePointerDown.clickX;
           this._dragSourceY = this._linePointerDown.lineY;
-          this._dragCurrentX = this._cursorX;
-          this._dragCurrentY = this._cursorY;
+          this._dragCurrentX = contentX;
+          this._dragCurrentY = contentY;
           this._dragTime = 0;
           for (const wl of this.worldlines) {
             wl.setHover(0, false);
@@ -856,23 +1096,23 @@ export default class PixiScene {
 
     // Check potential drag from worldline internal event
     if (this._potentialDrag && !this._dragActive) {
-      const dx = this._cursorX - this._potentialDrag.x;
-      const dy = this._cursorY - this._potentialDrag.y;
+      const dx = contentX - this._potentialDrag.x;
+      const dy = contentY - this._potentialDrag.y;
       if (Math.sqrt(dx * dx + dy * dy) > 5) {
         this._onDragStart(this._potentialDrag);
         this._potentialDrag = null;
       }
     }
 
-    const nearConnection = this._isNearConnection(this._cursorX, this._cursorY);
+    const nearConnection = this._isNearConnection(contentX, contentY);
     for (const wl of this.worldlines) {
-      const isNear = wl.isNearY(this._cursorY) && !nearConnection;
-      wl.setHover(this._cursorX, isNear && !this._dragActive);
+      const isNear = wl.isNearY(contentY) && !nearConnection;
+      wl.setHover(contentX, isNear && !this._dragActive);
     }
 
     if (this._dragActive) {
-      this._dragCurrentX = this._cursorX;
-      this._dragCurrentY = this._cursorY;
+      this._dragCurrentX = contentX;
+      this._dragCurrentY = contentY;
     }
   }
 
@@ -896,38 +1136,83 @@ export default class PixiScene {
   _onPointerUp(e) {
     this._potentialDrag = null;
 
+    if (this._isPanning) {
+      this._isPanning = false;
+      if (this.app?.canvas) {
+        this.app.canvas.style.cursor = 'default';
+      }
+    }
+
     if (this._scrubberDragging) {
       this._scrubberDragging = false;
     }
 
     // 1. If dragging an entanglement connection
     if (this._dragActive) {
-      for (let targetIdx = 0; targetIdx < this.worldlines.length; targetIdx++) {
-        const wl = this.worldlines[targetIdx];
-        if (wl.qubitId === this._dragSourceId) continue;
-        if (wl.isNearY(this._dragCurrentY)) {
-          const sourceIdx = this.qubits.findIndex(q => q.id === this._dragSourceId);
-          if (sourceIdx !== -1 && targetIdx !== -1) {
-            let allowConnect = true;
-            if (this.tutorialState?.active) {
-              if (this.tutorialState.step === 5) {
-                allowConnect = (sourceIdx === 0 && targetIdx === 1) || (sourceIdx === 1 && targetIdx === 0);
-              } else if (this.tutorialState.step === 8) {
-                allowConnect = (sourceIdx === 0 && targetIdx === 2) || (sourceIdx === 2 && targetIdx === 0);
-              } else {
-                allowConnect = false;
-              }
-            }
+      const sourceIdx = this.qubits.findIndex(q => q.id === this._dragSourceId);
 
-            if (allowConnect) {
-              const sourceWl = this.worldlines[sourceIdx];
-              const usableStart = sourceWl ? sourceWl.lineX + sourceWl.START_NODE_WIDTH + 8 : 218;
-              const usableWidth = sourceWl ? sourceWl.lineWidth - sourceWl.START_NODE_WIDTH - 8 : 500;
-              const position = Math.max(0.1, Math.min(0.9, (this._dragSourceX - usableStart) / usableWidth));
-              this.onCNOTCreate(sourceIdx, targetIdx, position);
+      // Check if dropped onto or near an existing connection to add a control (upgrading to CCNOT / MCX)
+      let addedToConnection = false;
+      if (sourceIdx !== -1 && !this.tutorialState?.active) {
+        for (const conn of this.connections) {
+          if (conn.type !== 'CNOT' && conn.type !== 'CCNOT' && conn.type !== 'MCX') continue;
+          const ctrls = getControls(conn);
+          const ctrlWls = ctrls.map(c => this.worldlines[c]).filter(Boolean);
+          const targetWl = this.worldlines[conn.target];
+          if (ctrlWls.length === 0 || !targetWl) continue;
+
+          const pos = conn.position ?? 0.5;
+          const refWl = ctrlWls[0] || targetWl;
+          const usableStart = refWl.lineX + refWl.START_NODE_WIDTH + 8;
+          const usableWidth = refWl.lineWidth - refWl.START_NODE_WIDTH - 8;
+          const cx = usableStart + usableWidth * pos;
+
+          const allY = [...ctrlWls.map(w => w.lineY), targetWl.lineY];
+          const minY = Math.min(...allY);
+          const maxY = Math.max(...allY);
+
+          // Check if dropped near the connection's vertical bus line, badge, or buttons
+          const nearX = Math.abs(this._dragCurrentX - cx) <= 28;
+          const nearY = (this._dragCurrentY >= minY - 24 && this._dragCurrentY <= maxY + 24) ||
+                        Math.abs(this._dragCurrentY - (minY + maxY) / 2) <= 32;
+
+          if (nearX && nearY) {
+            if (conn.target !== sourceIdx && !ctrls.includes(sourceIdx)) {
+              this.onAddControlToConnection(conn.id, sourceIdx);
+              addedToConnection = true;
+              break;
             }
           }
-          break;
+        }
+      }
+
+      if (!addedToConnection) {
+        for (let targetIdx = 0; targetIdx < this.worldlines.length; targetIdx++) {
+          const wl = this.worldlines[targetIdx];
+          if (wl.qubitId === this._dragSourceId) continue;
+          if (wl.isNearY(this._dragCurrentY)) {
+            if (sourceIdx !== -1 && targetIdx !== -1) {
+              let allowConnect = true;
+              if (this.tutorialState?.active) {
+                if (this.tutorialState.step === 5) {
+                  allowConnect = (sourceIdx === 0 && targetIdx === 1) || (sourceIdx === 1 && targetIdx === 0);
+                } else if (this.tutorialState.step === 8) {
+                  allowConnect = (sourceIdx === 0 && targetIdx === 2) || (sourceIdx === 2 && targetIdx === 0);
+                } else {
+                  allowConnect = false;
+                }
+              }
+
+              if (allowConnect) {
+                const sourceWl = this.worldlines[sourceIdx];
+                const usableStart = sourceWl ? sourceWl.lineX + sourceWl.START_NODE_WIDTH + 8 : 218;
+                const usableWidth = sourceWl ? sourceWl.lineWidth - sourceWl.START_NODE_WIDTH - 8 : 500;
+                const position = Math.max(0.1, Math.min(0.9, (this._dragSourceX - usableStart) / usableWidth));
+                this.onCNOTCreate(sourceIdx, targetIdx, position);
+              }
+            }
+            break;
+          }
         }
       }
 
@@ -937,7 +1222,7 @@ export default class PixiScene {
       return;
     }
 
-    // 2. If it was a quick click on the line track -> place an H gate!
+    // 2. If it was a quick click on the line track -> place an Uncertainty gate!
     if (this._linePointerDown) {
       const elapsed = Date.now() - this._linePointerDown.time;
       if (elapsed < 400) {
@@ -983,9 +1268,7 @@ export default class PixiScene {
     this._tutorialLayer.removeChildren();
 
     const step = this.tutorialState?.step;
-    const { padding, lineWidth } = this._getLayout();
-    const usableStart = padding + 138;
-    const usableWidth = lineWidth - 138;
+    const { padding, lineWidth, usableStart, usableWidth } = this._getLayout();
     const pulse = 0.5 + 0.5 * Math.sin(this._tutorialTime * 5);
 
     // ── STEP 2: Highlight Beat 1 Box (Hero) ──────────────────────────
@@ -1171,8 +1454,8 @@ export default class PixiScene {
     else if (step === 8 && this.worldlines[0] && this.worldlines[2]) {
       const wl0 = this.worldlines[0];
       const wl2 = this.worldlines[2];
-      const hasConnTo3 = this.connections.some(c => (c.control === 0 && c.target === 2) || (c.control === 2 && c.target === 0));
-      const connTo3 = this.connections.find(c => (c.control === 0 && c.target === 2) || (c.control === 2 && c.target === 0));
+      const hasConnTo3 = this.connections.some(c => (getControls(c).includes(0) && c.target === 2) || (getControls(c).includes(2) && c.target === 0));
+      const connTo3 = this.connections.find(c => (getControls(c).includes(0) && c.target === 2) || (getControls(c).includes(2) && c.target === 0));
 
       const g = new PIXI.Graphics();
 
@@ -1423,6 +1706,8 @@ export default class PixiScene {
         this.container.clientHeight
       );
     }
+    this._clampPanAndScroll();
+    this._applyContentTransform();
     this._rebuildWorldlines();
   }
 
@@ -1431,6 +1716,9 @@ export default class PixiScene {
     try {
       if (this.resizeObserver) {
         this.resizeObserver.disconnect();
+      }
+      if (this.app?.canvas && this._wheelHandler) {
+        this.app.canvas.removeEventListener('wheel', this._wheelHandler);
       }
       if (this.app && !this.isInitializing) {
         if (this.app.canvas && this.app.canvas.parentNode) {

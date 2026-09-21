@@ -61,23 +61,19 @@ export class QuantumSimulator {
         } else if (gateType === 'X') {
             // Pauli-X / Shift by 1
             targetEntity.apply(Operations.Shift(1));
-        } else if (gateType === 'CNOT') {
-            const controlEntity = this.entities[control];
-            if (!controlEntity) return;
+        } else if (gateType === 'CNOT' || gateType === 'CCNOT' || gateType === 'MCX') {
+            const ctrlList = Array.isArray(params?.controls)
+                ? params.controls
+                : (Array.isArray(control) ? control : (control !== null && control !== undefined ? [control] : []));
 
-            if (params.parity === 'odd') {
-                // Odd Parity: If control is 0, flip target (mutual exclusion / conflict)
-                EntanglementEngine.conditionalInteract({
-                    controls: [controlEntity.is(0)],
-                    targets: [{ entity: targetEntity, operation: Operations.Shift(1) }]
-                });
-            } else {
-                // Even Parity: If control is 1, flip target (co-occurrence / sync)
-                EntanglementEngine.conditionalInteract({
-                    controls: [controlEntity.is(1)],
-                    targets: [{ entity: targetEntity, operation: Operations.Shift(1) }]
-                });
-            }
+            const controlEntities = ctrlList.map(c => this.entities[c]).filter(Boolean);
+            if (controlEntities.length === 0) return;
+
+            const condVal = params?.parity === 'odd' ? 0 : 1;
+            EntanglementEngine.conditionalInteract({
+                controls: controlEntities.map(ce => ce.is(condVal)),
+                targets: [{ entity: targetEntity, operation: Operations.Shift(1) }]
+            });
         }
     }
 
