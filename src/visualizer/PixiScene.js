@@ -29,6 +29,7 @@ export default class PixiScene {
     this.hasPhaseInterference = options.hasPhaseInterference || false;
     this.scrubberPosition = options.scrubberPosition ?? 1.0;
     this.sliceInfo = options.sliceInfo || null;
+    this.tutorialState = options.tutorialState || null;
 
     this.app = null;
     this.stage = null;
@@ -51,6 +52,10 @@ export default class PixiScene {
     // Timeline Scrubber state
     this._scrubberLayer = null;
     this._scrubberDragging = false;
+
+    // Tutorial Guidance state
+    this._tutorialLayer = null;
+    this._tutorialTime = 0;
 
     // Cursor tracking
     this._cursorX = -1000;
@@ -138,6 +143,10 @@ export default class PixiScene {
       this._scrubberLayer = new PIXI.Container();
       this._scrubberLayer.eventMode = 'passive';
       this.stage.addChild(this._scrubberLayer);
+
+      this._tutorialLayer = new PIXI.Container();
+      this._tutorialLayer.eventMode = 'none';
+      this.stage.addChild(this._tutorialLayer);
 
       this._potentialDrag = null;
       this._linePointerDown = null;
@@ -337,6 +346,9 @@ export default class PixiScene {
     });
     hitZone.on('pointerdown', (e) => {
       e.stopPropagation();
+      if (this.tutorialState?.active && this.tutorialState.step < 7) {
+        return;
+      }
       this.onAddWorldline();
     });
 
@@ -427,13 +439,13 @@ export default class PixiScene {
       // Midpoint for parity badge
       const midY = (y1 + y2) / 2;
 
-      // Parity Pill Container
+      // Parity Pill Container (AND / OR)
       const badgeContainer = new PIXI.Container();
       badgeContainer.x = x;
       badgeContainer.y = midY;
 
-      const badgeWidth = 90;
-      const badgeHeight = 24;
+      const badgeWidth = 54;
+      const badgeHeight = 22;
 
       const badgeGraphics = new PIXI.Graphics();
       const renderBadge = (isHover) => {
@@ -444,7 +456,7 @@ export default class PixiScene {
           color: isHover ? (isOdd ? 0xb45309 : 0x5b21b6) : badgeBorder,
           alpha: 1,
         });
-        badgeGraphics.roundRect(-badgeWidth / 2, -badgeHeight / 2, badgeWidth, badgeHeight, 12);
+        badgeGraphics.roundRect(-badgeWidth / 2, -badgeHeight / 2, badgeWidth, badgeHeight, 11);
         badgeGraphics.fill();
         badgeGraphics.stroke();
       };
@@ -453,10 +465,10 @@ export default class PixiScene {
       badgeContainer.addChild(badgeGraphics);
 
       const badgeText = new PIXI.Text({
-        text: isOdd ? '≠ ODD PARITY' : '= EVEN PARITY',
+        text: isOdd ? 'OR' : 'AND',
         style: {
-          fontFamily: '"Inter", monospace, system-ui',
-          fontSize: 9,
+          fontFamily: '"Inter", system-ui, sans-serif',
+          fontSize: 10,
           fontWeight: 'bold',
           fill: textColor,
           letterSpacing: 0.5,
@@ -469,7 +481,7 @@ export default class PixiScene {
       // Interactive toggle hit area on badgeContainer
       badgeContainer.eventMode = 'static';
       badgeContainer.cursor = 'pointer';
-      badgeContainer.hitArea = new PIXI.Rectangle(-badgeWidth / 2 - 4, -badgeHeight / 2 - 4, badgeWidth + 8, badgeHeight + 8);
+      badgeContainer.hitArea = new PIXI.Rectangle(-badgeWidth / 2 - 8, -badgeHeight / 2 - 6, badgeWidth + 16, badgeHeight + 12);
 
       const connId = conn.id;
       badgeContainer.on('pointerdown', (e) => {
@@ -820,18 +832,22 @@ export default class PixiScene {
 
     // Detect drag initiation from line press
     if (this._linePointerDown && !this._dragActive) {
-      const dx = this._cursorX - this._linePointerDown.clickX;
-      const dy = this._cursorY - this._linePointerDown.clickY;
-      if (Math.sqrt(dx * dx + dy * dy) > 6) {
-        this._dragActive = true;
-        this._dragSourceId = this._linePointerDown.qubitId;
-        this._dragSourceX = this._linePointerDown.clickX;
-        this._dragSourceY = this._linePointerDown.lineY;
-        this._dragCurrentX = this._cursorX;
-        this._dragCurrentY = this._cursorY;
-        this._dragTime = 0;
-        for (const wl of this.worldlines) {
-          wl.setHover(0, false);
+      if (this.tutorialState?.active && this.tutorialState.step !== 5 && this.tutorialState.step !== 8) {
+        // Drag blocked in non-drag tutorial steps
+      } else {
+        const dx = this._cursorX - this._linePointerDown.clickX;
+        const dy = this._cursorY - this._linePointerDown.clickY;
+        if (Math.sqrt(dx * dx + dy * dy) > 6) {
+          this._dragActive = true;
+          this._dragSourceId = this._linePointerDown.qubitId;
+          this._dragSourceX = this._linePointerDown.clickX;
+          this._dragSourceY = this._linePointerDown.lineY;
+          this._dragCurrentX = this._cursorX;
+          this._dragCurrentY = this._cursorY;
+          this._dragTime = 0;
+          for (const wl of this.worldlines) {
+            wl.setHover(0, false);
+          }
         }
       }
     }
@@ -859,6 +875,9 @@ export default class PixiScene {
   }
 
   _onDragStart(data) {
+    if (this.tutorialState?.active && this.tutorialState.step !== 5 && this.tutorialState.step !== 8) {
+      return;
+    }
     this._dragActive = true;
     this._dragSourceId = data.qubitId;
     this._dragSourceX = data.x;
@@ -887,11 +906,24 @@ export default class PixiScene {
         if (wl.isNearY(this._dragCurrentY)) {
           const sourceIdx = this.qubits.findIndex(q => q.id === this._dragSourceId);
           if (sourceIdx !== -1 && targetIdx !== -1) {
-            const sourceWl = this.worldlines[sourceIdx];
-            const usableStart = sourceWl ? sourceWl.lineX + sourceWl.START_NODE_WIDTH + 8 : 218;
-            const usableWidth = sourceWl ? sourceWl.lineWidth - sourceWl.START_NODE_WIDTH - 8 : 500;
-            const position = Math.max(0.05, Math.min(0.95, (this._dragSourceX - usableStart) / usableWidth));
-            this.onCNOTCreate(sourceIdx, targetIdx, position);
+            let allowConnect = true;
+            if (this.tutorialState?.active) {
+              if (this.tutorialState.step === 5) {
+                allowConnect = (sourceIdx === 0 && targetIdx === 1) || (sourceIdx === 1 && targetIdx === 0);
+              } else if (this.tutorialState.step === 8) {
+                allowConnect = (sourceIdx === 0 && targetIdx === 2) || (sourceIdx === 2 && targetIdx === 0);
+              } else {
+                allowConnect = false;
+              }
+            }
+
+            if (allowConnect) {
+              const sourceWl = this.worldlines[sourceIdx];
+              const usableStart = sourceWl ? sourceWl.lineX + sourceWl.START_NODE_WIDTH + 8 : 218;
+              const usableWidth = sourceWl ? sourceWl.lineWidth - sourceWl.START_NODE_WIDTH - 8 : 500;
+              const position = Math.max(0.1, Math.min(0.9, (this._dragSourceX - usableStart) / usableWidth));
+              this.onCNOTCreate(sourceIdx, targetIdx, position);
+            }
           }
           break;
         }
@@ -907,16 +939,24 @@ export default class PixiScene {
     if (this._linePointerDown) {
       const elapsed = Date.now() - this._linePointerDown.time;
       if (elapsed < 400) {
-        const posFraction = (this._linePointerDown.clickX - this._linePointerDown.startX) / this._linePointerDown.totalWidth;
-        const position = Math.max(0.05, Math.min(0.95, posFraction));
-        this.onPlaceGate(this._linePointerDown.qubitId, position);
+        let allowGate = true;
+        if (this.tutorialState?.active) {
+          // Gated: in step 4, only allow clicking qubit 0, and only if 0 gates exist
+          allowGate = (this.tutorialState.step === 4 && this._linePointerDown.qubitId === this.qubits[0]?.id && (this.qubits[0]?.gates?.length || 0) === 0);
+        }
+
+        if (allowGate) {
+          const posFraction = (this._linePointerDown.clickX - this._linePointerDown.startX) / this._linePointerDown.totalWidth;
+          const position = Math.max(0.05, Math.min(0.95, posFraction));
+          this.onPlaceGate(this._linePointerDown.qubitId, position);
+        }
       }
       this._linePointerDown = null;
     }
   }
 
   // ═══════════════════════════════════════════════════════════════════════
-  //  TICK
+  //  TICK & TUTORIAL GUIDANCE
   // ═══════════════════════════════════════════════════════════════════════
 
   _tick(ticker) {
@@ -927,6 +967,255 @@ export default class PixiScene {
     if (this._dragActive) {
       this._dragTime += dt * 0.05;
       this._drawDragThread();
+    }
+    if (this.tutorialState?.active && this.tutorialState?.step) {
+      this._tutorialTime += dt * 0.05;
+      this._renderTutorialGuidance();
+    } else if (this._tutorialLayer && this._tutorialLayer.children.length > 0) {
+      this._tutorialLayer.removeChildren();
+    }
+  }
+
+  _renderTutorialGuidance() {
+    if (!this._tutorialLayer) return;
+    this._tutorialLayer.removeChildren();
+
+    const step = this.tutorialState?.step;
+    const { padding, lineWidth } = this._getLayout();
+    const usableStart = padding + 138;
+    const usableWidth = lineWidth - 138;
+    const pulse = 0.5 + 0.5 * Math.sin(this._tutorialTime * 5);
+
+    // ── STEP 2: Highlight Beat 1 Box (Hero) ──────────────────────────
+    if (step === 2 && this.worldlines[0]) {
+      const wl0 = this.worldlines[0];
+      const g = new PIXI.Graphics();
+      const bx = wl0.lineX - 4;
+      const by = wl0.lineY - 28;
+      const bw = wl0.START_NODE_WIDTH + 8;
+      const bh = 56;
+
+      g.setStrokeStyle({ width: 3, color: 0x0284c7, alpha: 0.6 + 0.4 * pulse });
+      g.roundRect(bx, by, bw, bh, 14);
+      g.stroke();
+
+      g.setStrokeStyle({ width: 6, color: 0x38bdf8, alpha: 0.25 * pulse });
+      g.roundRect(bx - 3, by - 3, bw + 6, bh + 6, 16);
+      g.stroke();
+
+      const label = new PIXI.Text({
+        text: '👉 Click to name Beat 1',
+        style: { fontFamily: '"Inter", system-ui, sans-serif', fontSize: 11, fontWeight: 'bold', fill: 0x0369a1 }
+      });
+      label.x = bx + bw / 2;
+      label.y = by - 14;
+      label.anchor.set(0.5, 1);
+      this._tutorialLayer.addChild(g);
+      this._tutorialLayer.addChild(label);
+    }
+
+    // ── STEP 3: Highlight Beat 2 Box (Dragon) ────────────────────────
+    else if (step === 3 && this.worldlines[1]) {
+      const wl1 = this.worldlines[1];
+      const g = new PIXI.Graphics();
+      const bx = wl1.lineX - 4;
+      const by = wl1.lineY - 28;
+      const bw = wl1.START_NODE_WIDTH + 8;
+      const bh = 56;
+
+      g.setStrokeStyle({ width: 3, color: 0xea580c, alpha: 0.6 + 0.4 * pulse });
+      g.roundRect(bx, by, bw, bh, 14);
+      g.stroke();
+
+      g.setStrokeStyle({ width: 6, color: 0xfb923c, alpha: 0.25 * pulse });
+      g.roundRect(bx - 3, by - 3, bw + 6, bh + 6, 16);
+      g.stroke();
+
+      const label = new PIXI.Text({
+        text: '👉 Click to name Beat 2',
+        style: { fontFamily: '"Inter", system-ui, sans-serif', fontSize: 11, fontWeight: 'bold', fill: 0xc2410c }
+      });
+      label.x = bx + bw / 2;
+      label.y = by - 14;
+      label.anchor.set(0.5, 1);
+      this._tutorialLayer.addChild(g);
+      this._tutorialLayer.addChild(label);
+    }
+
+    // ── STEP 4: Target Beacon on Worldline 1 (Uncertainty Gate) ──────
+    else if (step === 4 && this.worldlines[0]) {
+      const wl0 = this.worldlines[0];
+      const targetX = usableStart + 0.28 * usableWidth;
+      const targetY = wl0.lineY;
+      const g = new PIXI.Graphics();
+
+      const rOuter = 15 + pulse * 6;
+      g.setStrokeStyle({ width: 2, color: 0x0284c7, alpha: 0.7 });
+      g.circle(targetX, targetY, rOuter);
+      g.stroke();
+
+      g.fill({ color: 0x0284c7, alpha: 0.2 + 0.15 * pulse });
+      g.circle(targetX, targetY, 10);
+      g.fill();
+
+      g.fill({ color: 0x0284c7, alpha: 0.9 });
+      g.circle(targetX, targetY, 4);
+      g.fill();
+
+      const label = new PIXI.Text({
+        text: '🎯 Click here to place Uncertainty gate',
+        style: { fontFamily: '"Inter", system-ui, sans-serif', fontSize: 11, fontWeight: 'bold', fill: 0x0369a1 }
+      });
+      label.x = targetX;
+      label.y = targetY - 22;
+      label.anchor.set(0.5, 1);
+      this._tutorialLayer.addChild(g);
+      this._tutorialLayer.addChild(label);
+    }
+
+    // ── STEP 5: Drag from Line 1 to Line 2 ("Drag from here to here") ─
+    else if (step === 5 && this.worldlines[0] && this.worldlines[1]) {
+      const wl0 = this.worldlines[0];
+      const wl1 = this.worldlines[1];
+      const sx = usableStart + 0.55 * usableWidth;
+      const sy = wl0.lineY;
+      const ey = wl1.lineY;
+      const g = new PIXI.Graphics();
+
+      // Source beacon
+      g.fill({ color: 0x6366f1, alpha: 0.85 });
+      g.circle(sx, sy, 7);
+      g.fill();
+      g.setStrokeStyle({ width: 2, color: 0x818cf8, alpha: 0.7 + 0.3 * pulse });
+      g.circle(sx, sy, 12 + 4 * pulse);
+      g.stroke();
+
+      // Target beacon
+      g.setStrokeStyle({ width: 2, color: 0x6366f1, alpha: 0.8 });
+      g.circle(sx, ey, 9);
+      g.stroke();
+      g.fill({ color: 0x6366f1, alpha: 0.25 });
+      g.circle(sx, ey, 9);
+      g.fill();
+
+      // Animated line from source to target
+      const arrowProgress = (this._tutorialTime * 2) % 1;
+      const currY = sy + (ey - sy) * arrowProgress;
+      g.setStrokeStyle({ width: 2.5, color: 0x6366f1, alpha: 0.6 });
+      g.moveTo(sx, sy);
+      g.lineTo(sx, ey);
+      g.stroke();
+
+      // Moving tracer dot
+      g.fill({ color: 0xa855f7, alpha: 0.95 });
+      g.circle(sx, currY, 5);
+      g.fill();
+
+      // Annotation text
+      const label = new PIXI.Text({
+        text: '⬇ Drag from here to here',
+        style: { fontFamily: '"Inter", system-ui, sans-serif', fontSize: 11, fontWeight: 'bold', fill: 0x4f46e5 }
+      });
+      label.x = sx + 16;
+      label.y = (sy + ey) / 2;
+      label.anchor.set(0, 0.5);
+      this._tutorialLayer.addChild(g);
+      this._tutorialLayer.addChild(label);
+    }
+
+    // ── STEP 7: Highlight "+ Add Story Worldline" Button ──────────────
+    else if (step === 7 && this._addBtn) {
+      const { lineSpacing } = this._getLayout();
+      const lastY = padding + lineSpacing * (this.qubits.length + 1);
+      const g = new PIXI.Graphics();
+      const bx = padding - 14;
+      const by = lastY - 14;
+      const bw = 160;
+      const bh = 28;
+
+      g.setStrokeStyle({ width: 2.5, color: 0x0284c7, alpha: 0.7 + 0.3 * pulse });
+      g.roundRect(bx, by, bw, bh, 8);
+      g.stroke();
+
+      g.setStrokeStyle({ width: 5, color: 0x38bdf8, alpha: 0.25 * pulse });
+      g.roundRect(bx - 3, by - 3, bw + 6, bh + 6, 10);
+      g.stroke();
+
+      const label = new PIXI.Text({
+        text: '➕ Click to add 3rd Worldline',
+        style: { fontFamily: '"Inter", system-ui, sans-serif', fontSize: 10.5, fontWeight: 'bold', fill: 0x0369a1 }
+      });
+      label.x = bx + bw + 10;
+      label.y = lastY;
+      label.anchor.set(0, 0.5);
+      this._tutorialLayer.addChild(g);
+      this._tutorialLayer.addChild(label);
+    }
+
+    // ── STEP 8: Connect Line 1 to Line 3, then Toggle to OR ──────────
+    else if (step === 8 && this.worldlines[0] && this.worldlines[2]) {
+      const wl0 = this.worldlines[0];
+      const wl2 = this.worldlines[2];
+      const hasConnTo3 = this.connections.some(c => (c.control === 0 && c.target === 2) || (c.control === 2 && c.target === 0));
+      const connTo3 = this.connections.find(c => (c.control === 0 && c.target === 2) || (c.control === 2 && c.target === 0));
+
+      const g = new PIXI.Graphics();
+
+      if (!hasConnTo3) {
+        // Drag prompt to line 3
+        const sx = usableStart + 0.72 * usableWidth;
+        const sy = wl0.lineY;
+        const ey = wl2.lineY;
+
+        g.fill({ color: 0x6366f1, alpha: 0.85 });
+        g.circle(sx, sy, 7);
+        g.fill();
+        g.setStrokeStyle({ width: 2, color: 0x818cf8, alpha: 0.7 + 0.3 * pulse });
+        g.circle(sx, sy, 12 + 4 * pulse);
+        g.stroke();
+
+        g.setStrokeStyle({ width: 2, color: 0x6366f1, alpha: 0.8 });
+        g.circle(sx, ey, 9);
+        g.stroke();
+
+        g.setStrokeStyle({ width: 2.5, color: 0x6366f1, alpha: 0.6 });
+        g.moveTo(sx, sy);
+        g.lineTo(sx, ey);
+        g.stroke();
+
+        const label = new PIXI.Text({
+          text: '⬇ Drag to connect to Worldline 3',
+          style: { fontFamily: '"Inter", system-ui, sans-serif', fontSize: 11, fontWeight: 'bold', fill: 0x4f46e5 }
+        });
+        label.x = sx + 16;
+        label.y = (sy + ey) / 2;
+        label.anchor.set(0, 0.5);
+        this._tutorialLayer.addChild(g);
+        this._tutorialLayer.addChild(label);
+      } else if (connTo3?.parity !== 'odd') {
+        // Prompt to click parity badge to toggle to OR!
+        const pos = connTo3.position ?? 0.5;
+        const cx = usableStart + usableWidth * pos;
+        const midY = (wl0.lineY + wl2.lineY) / 2;
+
+        g.setStrokeStyle({ width: 2.5, color: 0xb45309, alpha: 0.7 + 0.3 * pulse });
+        g.roundRect(cx - 36, midY - 14, 72, 28, 14);
+        g.stroke();
+
+        g.setStrokeStyle({ width: 5, color: 0xf59e0b, alpha: 0.28 * pulse });
+        g.roundRect(cx - 39, midY - 17, 78, 34, 16);
+        g.stroke();
+
+        const label = new PIXI.Text({
+          text: '👆 Click badge to toggle to OR',
+          style: { fontFamily: '"Inter", system-ui, sans-serif', fontSize: 10.5, fontWeight: 'bold', fill: 0x92400e }
+        });
+        label.x = cx + 42;
+        label.y = midY;
+        label.anchor.set(0, 0.5);
+        this._tutorialLayer.addChild(g);
+        this._tutorialLayer.addChild(label);
+      }
     }
   }
 
@@ -1072,6 +1361,15 @@ export default class PixiScene {
     if (this._ready) {
       this._drawScrubber();
       this._updateWorldlinesForScrubber();
+    }
+  }
+
+  updateTutorialState(state) {
+    this.tutorialState = state;
+    if (!state?.active) {
+      if (this._tutorialLayer) {
+        this._tutorialLayer.removeChildren();
+      }
     }
   }
 

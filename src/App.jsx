@@ -20,7 +20,7 @@ const MAX_WORLDLINES = 10;
 
 const DEFAULT_PRESETS = {
   even_bell: {
-    name: '🤝 Even Parity (Always Together)',
+    name: '🤝 AND (Always Together)',
     description: 'When the Hero ascends, the Guide must follow. They always share the same fate.',
     qubits: [
       { id: 'q0', name: 'The Hero', active: 'Scales the mountain peak', passive: 'Stays in the valley', gates: [{ id: 'g0', type: 'Ry', theta: Math.PI / 2, position: 0.25 }] },
@@ -31,7 +31,7 @@ const DEFAULT_PRESETS = {
     ]
   },
   odd_bell: {
-    name: '⚔️ Odd Parity (Never Together / Conflict)',
+    name: '⚔️ OR (Never Together / Conflict)',
     description: 'Zero-sum conflict: The Protagonist and The Rival cannot both claim victory.',
     qubits: [
       { id: 'q0', name: 'The Protagonist', active: 'Claims the ancient crown', passive: 'Yields into exile', gates: [{ id: 'g0', type: 'Ry', theta: Math.PI / 2, position: 0.25 }] },
@@ -42,8 +42,8 @@ const DEFAULT_PRESETS = {
     ]
   },
   triad: {
-    name: '🎭 Triad of Fate (Even + Odd Links)',
-    description: 'Hero is entangled evenly with the Ally, and odd-parity entangled with the Adversary.',
+    name: '🎭 Triad of Fate (AND + OR Links)',
+    description: 'Hero is entangled with AND to the Ally, and OR-entangled with the Adversary.',
     qubits: [
       { id: 'q0', name: 'The Hero', active: 'Breaches the dark citadel', passive: 'Retreats to regroup', gates: [{ id: 'g0', type: 'Ry', theta: Math.PI / 2, position: 0.2 }] },
       { id: 'q1', name: 'The Ally', active: 'Provides covering fire', passive: 'Falls back to perimeter', gates: [] },
@@ -283,16 +283,17 @@ export default function App() {
     setQubits(prev => {
       if (prev.length >= MAX_WORLDLINES) return prev;
       const num = prev.length + 1;
+      const isTutorialSword = showTutorial && tutorialStep === 7 && prev.length === 2;
       return [...prev, {
         id: `q${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-        name: customData?.name || `Character ${num}`,
-        active: customData?.active || `Positive outcome for Character ${num}`,
-        passive: customData?.passive || `Negative outcome for Character ${num}`,
+        name: customData?.name || (isTutorialSword ? 'The Magic Sword' : `Character ${num}`),
+        active: customData?.active || (isTutorialSword ? 'Hero draws the radiant Sunblade' : `Positive outcome for Character ${num}`),
+        passive: customData?.passive || (isTutorialSword ? 'Blade remains trapped in stone' : `Negative outcome for Character ${num}`),
         gates: [],
       }];
     });
     setIsDirty(true);
-  }, []);
+  }, [showTutorial, tutorialStep]);
 
   const removeWorldlineById = useCallback((qubitId) => {
     setQubits(prev => {
@@ -334,6 +335,22 @@ export default function App() {
       action();
     }
   }, [isDirty]);
+
+  const startTutorialWithGuard = useCallback(() => {
+    requestActionWithGuard(() => {
+      setQubits([
+        { id: 'q0', name: 'Story Line 1', active: '', passive: '', gates: [] },
+        { id: 'q1', name: 'Story Line 2', active: '', passive: '', gates: [] },
+      ]);
+      setConnections([]);
+      setEditingGate(null);
+      setScrubberPosition(1.0);
+      setShowTutorial(true);
+      setTutorialStep(1);
+      setShowNarrativesSidebar(false);
+      setIsDirty(false);
+    }, 'start the tutorial and reset to 2 empty worldlines');
+  }, [requestActionWithGuard]);
 
   const handlePromptDiscard = () => {
     const action = unsavedPromptState.pendingAction;
@@ -377,13 +394,13 @@ export default function App() {
     if (actionType === 'RESET_2_QUBITS') {
       requestActionWithGuard(() => {
         setQubits([
-          { id: 'q0', name: 'Story Line 1', active: 'Hero goes on adventure', passive: 'Hero stays at home', gates: [] },
-          { id: 'q1', name: 'Story Line 2', active: 'Dragon flees', passive: 'Dragon destroys village', gates: [] },
+          { id: 'q0', name: 'Story Line 1', active: '', passive: '', gates: [] },
+          { id: 'q1', name: 'Story Line 2', active: '', passive: '', gates: [] },
         ]);
         setConnections([]);
         setEditingGate(null);
-        setIsDirty(true);
-      }, 'reset to tutorial worldlines');
+        setIsDirty(false);
+      }, 'reset to 2 empty worldlines');
     } else if (actionType === 'SET_HERO_BEAT') {
       setQubits(prev => prev.map((q, idx) => idx === 0 ? {
         ...q,
@@ -474,10 +491,7 @@ export default function App() {
 
           {/* Prominent "Start Here" Tutorial Button */}
           <button
-            onClick={() => {
-              setShowTutorial(true);
-              setTutorialStep(1);
-            }}
+            onClick={startTutorialWithGuard}
             className="ml-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white font-sans text-xs font-bold shadow-md shadow-orange-500/20 flex items-center gap-1.5 transition-all active:scale-[0.97] hover:shadow-lg cursor-pointer animate-pulse hover:animate-none"
             title="Start here! Interactive step-by-step tutorial: The Hero & The Dragon Quest"
           >
@@ -565,14 +579,14 @@ export default function App() {
                     className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 transition-colors"
                   >
                     <span>🤝</span>
-                    <span>Even Parity (Co-occur)</span>
+                    <span>AND (Co-occur)</span>
                   </button>
                   <button
                     onClick={() => { loadPreset('odd_bell'); setShowOverflowMenu(false); }}
                     className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 transition-colors"
                   >
                     <span>⚔️</span>
-                    <span>Odd Parity (Conflict)</span>
+                    <span>OR (Conflict)</span>
                   </button>
                   <button
                     onClick={() => { loadPreset('triad'); setShowOverflowMenu(false); }}
@@ -603,11 +617,11 @@ export default function App() {
                     <span>Save & Load Project Hub</span>
                   </button>
                   <button
-                    onClick={() => { setShowTutorial(true); setTutorialStep(1); setShowOverflowMenu(false); }}
+                    onClick={() => { startTutorialWithGuard(); setShowOverflowMenu(false); }}
                     className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-sky-700 transition-colors font-medium"
                   >
                     <span>🎓</span>
-                    <span>Interactive 8-Step Tutorial</span>
+                    <span>Interactive Tutorial (Hero & Dragon)</span>
                   </button>
                   <button
                     onClick={() => { setShowStoryBeats(true); setShowOverflowMenu(false); }}
@@ -684,6 +698,7 @@ export default function App() {
             hasPhaseInterference={hasPhaseInterference}
             scrubberPosition={scrubberPosition}
             sliceInfo={sliceInfo}
+            tutorialState={{ active: showTutorial, step: tutorialStep }}
             onScrubberChange={(pos) => setScrubberPosition(pos)}
             onCNOTCreate={addConnection}
             onToggleConnectionParity={handleToggleConnectionParity}
@@ -709,7 +724,7 @@ export default function App() {
               <span className="text-slate-300">·</span>
               <span><strong className="text-purple-700 font-semibold">Drag line-to-line</strong> to Entangle</span>
               <span className="text-slate-300">·</span>
-              <span><strong className="text-amber-700 font-semibold">Click Parity Badge</strong> to toggle Even/Odd</span>
+              <span><strong className="text-amber-700 font-semibold">Click Parity Badge</strong> to toggle AND/OR</span>
             </span>
           </div>
 
@@ -772,9 +787,9 @@ export default function App() {
             About & Ink Integration
           </button>
           <span>·</span>
-          <span>Even Parity: Both Beats Co-occur (Φ⁺)</span>
+          <span>AND: Both Beats Co-occur (Φ⁺)</span>
           <span>·</span>
-          <span>Odd Parity: Mutual Exclusion (Ψ⁺)</span>
+          <span>OR: Mutual Exclusion (Ψ⁺)</span>
         </div>
       </footer>
 
@@ -880,7 +895,7 @@ export default function App() {
         onSaveAndProceed={handlePromptSaveAndProceed}
       />
 
-      {/* Interactive 8-Step Tutorial Floating Guide */}
+      {/* Interactive 9-Step Tutorial Floating Guide */}
       <TutorialGuide
         isOpen={showTutorial}
         onClose={() => setShowTutorial(false)}
@@ -889,6 +904,11 @@ export default function App() {
         onApplyStepAction={handleTutorialStepAction}
         onOpenStoryModal={() => setShowStoryGenerator(true)}
         onOpenSaveLoadModal={() => setShowSaveLoadModal(true)}
+        isSidebarOpen={showNarrativesSidebar}
+        onOpenSidebar={() => setShowNarrativesSidebar(true)}
+        onCloseSidebar={() => setShowNarrativesSidebar(false)}
+        qubits={qubits}
+        connections={connections}
       />
     </div>
   );

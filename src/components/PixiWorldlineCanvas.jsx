@@ -11,6 +11,7 @@ export default function PixiWorldlineCanvas({
     hasPhaseInterference = false,
     scrubberPosition = 1.0,
     sliceInfo = null,
+    tutorialState = null,
     onScrubberChange,
     onCNOTCreate,
     onToggleConnectionParity,
@@ -56,6 +57,7 @@ export default function PixiWorldlineCanvas({
             hasPhaseInterference,
             scrubberPosition,
             sliceInfo,
+            tutorialState,
             onScrubberChange: (...args) => callbackRefs.current.onScrubberChange?.(...args),
             onCNOTCreate: (...args) => callbackRefs.current.onCNOTCreate?.(...args),
             onToggleConnectionParity: (...args) => callbackRefs.current.onToggleConnectionParity?.(...args),
@@ -108,6 +110,12 @@ export default function PixiWorldlineCanvas({
         if (isFirstRender.current) return;
         sceneRef.current?.updatePhaseInterference(hasPhaseInterference);
     }, [hasPhaseInterference]);
+
+    // Sync tutorial state
+    useEffect(() => {
+        if (isFirstRender.current) return;
+        sceneRef.current?.updateTutorialState(tutorialState);
+    }, [tutorialState]);
 
     return (
         <div
